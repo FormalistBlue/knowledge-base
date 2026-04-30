@@ -1,0 +1,291 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum KnowledgeStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum AttachmentUsageType {
+  IMAGE
+  ATTACHMENT
+}
+
+enum AttachmentStatus {
+  TEMP
+  BOUND
+}
+
+enum NotificationType {
+  KNOWLEDGE_COMMENTED
+  COMMENT_REPLIED
+  PASSWORD_RESET
+  KNOWLEDGE_UPDATED_BY_ADMIN
+}
+
+enum AuditAction {
+  CREATE_USER
+  DISABLE_USER
+  ENABLE_USER
+  RESET_PASSWORD
+  DELETE_KNOWLEDGE
+  PIN_KNOWLEDGE
+  UPDATE_KNOWLEDGE_CATEGORY
+  UPDATE_KNOWLEDGE_TAGS
+  DELETE_COMMENT
+  DELETE_CATEGORY
+  DELETE_TAG
+}
+
+model User {
+  id           String     @id @default(cuid())
+  username     String     @unique
+  passwordHash String
+  displayName  String
+  role         UserRole   @default(USER)
+  status       UserStatus @default(ACTIVE)
+  tokenVersion Int        @default(0)
+  lastLoginAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  deletedAt    DateTime?
+
+  knowledgeItems KnowledgeItem[]
+  createdTags    Tag[]               @relation("TagCreator")
+  comments       Comment[]
+  likes          KnowledgeLike[]
+  favorites      KnowledgeFavorite[]
+  views          KnowledgeView[]
+  attachments    Attachment[]
+  notifications  Notification[]
+  auditLogs      AuditLog[]          @relation("AuditActor")
+
+  @@index([role])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String
+  parentId  String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  parent   Category?       @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[]      @relation("CategoryTree")
+  items    KnowledgeItem[]
+
+  @@unique([parentId, name])
+  @@index([parentId])
+  @@index([deletedAt])
+}
+
+model Tag {
+  id             String   @id @default(cuid())
+  name           String
+  normalizedName String   @unique
+  createdById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  createdBy User?          @relation("TagCreator", fields: [createdById], references: [id])
+  items     KnowledgeTag[]
+
+  @@index([createdById])
+  @@index([deletedAt])
+}
+
+model KnowledgeItem {
+  id          String          @id @default(cuid())
+  title       String
+  summary     String
+  content     String
+  status      KnowledgeStatus @default(DRAFT)
+  categoryId  String
+  authorId    String
+  isPinned    Boolean         @default(false)
+  viewCount   Int             @default(0)
+  publishedAt DateTime?
+  archivedAt  DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  deletedAt   DateTime?
+
+  category    Category            @relation(fields: [categoryId], references: [id])
+  author      User                @relation(fields: [authorId], references: [id])
+  tags        KnowledgeTag[]
+  likes       KnowledgeLike[]
+  favorites   KnowledgeFavorite[]
+  views       KnowledgeView[]
+  comments    Comment[]
+  attachments Attachment[]
+
+  @@index([status])
+  @@index([categoryId])
+  @@index([authorId])
+  @@index([isPinned])
+  @@index([publishedAt])
+  @@index([updatedAt])
+  @@index([deletedAt])
+}
+
+model KnowledgeTag {
+  knowledgeId String
+  tagId       String
+  createdAt   DateTime @default(now())
+
+  knowledge KnowledgeItem @relation(fields: [knowledgeId], references: [id], onDelete: Cascade)
+  tag       Tag           @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([knowledgeId, tagId])
+  @@index([tagId])
+}
+
+model KnowledgeLike {
+  id          String   @id @default(cuid())
+  knowledgeId String
+  userId      String
+  createdAt   DateTime @default(now())
+
+  knowledge KnowledgeItem @relation(fields: [knowledgeId], references: [id])
+  user      User          @relation(fields: [userId], references: [id])
+
+  @@unique([knowledgeId, userId])
+  @@index([userId])
+}
+
+model KnowledgeFavorite {
+  id          String   @id @default(cuid())
+  knowledgeId String
+  userId      String
+  createdAt   DateTime @default(now())
+
+  knowledge KnowledgeItem @relation(fields: [knowledgeId], references: [id])
+  user      User          @relation(fields: [userId], references: [id])
+
+  @@unique([knowledgeId, userId])
+  @@index([userId])
+}
+
+model KnowledgeView {
+  id          String   @id @default(cuid())
+  knowledgeId String
+  userId      String
+  viewDate    DateTime
+  createdAt   DateTime @default(now())
+
+  knowledge KnowledgeItem @relation(fields: [knowledgeId], references: [id])
+  user      User          @relation(fields: [userId], references: [id])
+
+  @@unique([knowledgeId, userId, viewDate])
+  @@index([userId])
+  @@index([viewDate])
+}
+
+model Comment {
+  id          String   @id @default(cuid())
+  knowledgeId String
+  userId      String
+  parentId    String?
+  content     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  knowledge KnowledgeItem @relation(fields: [knowledgeId], references: [id])
+  user      User          @relation(fields: [userId], references: [id])
+  parent    Comment?      @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[]     @relation("CommentReplies")
+
+  @@index([knowledgeId])
+  @@index([userId])
+  @@index([parentId])
+  @@index([deletedAt])
+}
+
+model Attachment {
+  id           String              @id @default(cuid())
+  knowledgeId  String?
+  uploaderId   String
+  usageType    AttachmentUsageType
+  status       AttachmentStatus    @default(TEMP)
+  originalName String
+  storedName   String
+  relativePath String
+  fileSize     Int
+  mimeType     String
+  extension    String
+  createdAt    DateTime            @default(now())
+  boundAt      DateTime?
+  deletedAt    DateTime?
+
+  knowledge KnowledgeItem? @relation(fields: [knowledgeId], references: [id])
+  uploader  User           @relation(fields: [uploaderId], references: [id])
+
+  @@index([knowledgeId])
+  @@index([uploaderId])
+  @@index([usageType])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  userId      String
+  type        NotificationType
+  title       String
+  content     String
+  relatedType String?
+  relatedId   String?
+  isRead      Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  readAt      DateTime?
+  deletedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([type])
+  @@index([isRead])
+  @@index([createdAt])
+  @@index([deletedAt])
+}
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  actorId    String
+  action     AuditAction
+  targetType String
+  targetId   String?
+  summary    String
+  metadata   Json?
+  createdAt  DateTime    @default(now())
+
+  actor User @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@index([actorId])
+  @@index([action])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}
