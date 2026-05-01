@@ -72,12 +72,19 @@ body {
   font-size: 12px;
 }
 
-.home-page {
+.home-page,
+.page-stack {
   max-width: 1180px;
   margin: 0 auto;
 }
 
-.hero {
+.page-stack {
+  display: grid;
+  gap: 20px;
+}
+
+.hero,
+.page-hero {
   margin-bottom: 24px;
   padding: 42px;
   border: 1px solid rgba(47, 93, 80, 0.18);
@@ -87,10 +94,36 @@ body {
     linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(238, 230, 214, 0.72));
 }
 
+.page-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 0;
+}
+
+.page-hero.compact {
+  padding: 30px;
+}
+
 .hero p {
   max-width: 720px;
   font-size: 16px;
   line-height: 1.8;
+}
+
+.knowledge-tags {
+  margin: 18px 0;
+}
+
+.markdown-preview {
+  min-height: 280px;
+  padding: 24px;
+  border-radius: 18px;
+  background: rgba(47, 93, 80, 0.06);
+  color: inherit;
+  line-height: 1.9;
+  white-space: pre-wrap;
 }
 
 .login-page {

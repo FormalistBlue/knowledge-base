@@ -8,6 +8,7 @@ import { requestLogger } from './middlewares/request-logger.js';
 import { validate } from './middlewares/validate.js';
 import { adminUsersRouter } from './modules/admin/users.routes.js';
 import { authRouter } from './modules/auth/auth.routes.js';
+import { adminKnowledgeRouter, knowledgeRouter } from './modules/knowledge/knowledge.routes.js';
 import { adminCategoriesRouter, categoriesRouter } from './modules/taxonomy/categories.routes.js';
 import { adminTagsRouter, tagsRouter } from './modules/taxonomy/tags.routes.js';
 import { AppError } from './utils/app-error.js';
@@ -46,7 +47,9 @@ export const createApp = () => {
   app.use('/api/auth', authRouter);
   app.use('/api/categories', categoriesRouter);
   app.use('/api/tags', tagsRouter);
+  app.use('/api/knowledge', knowledgeRouter);
   app.use('/api/admin/users', adminUsersRouter);
+  app.use('/api/admin/knowledge', adminKnowledgeRouter);
   app.use('/api/admin/categories', adminCategoriesRouter);
   app.use('/api/admin/tags', adminTagsRouter);
 

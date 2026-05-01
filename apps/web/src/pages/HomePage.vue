@@ -11,14 +11,14 @@ const authStore = useAuthStore();
 <template>
   <main class="home-page">
     <section class="hero">
-      <NTag type="success" round>阶段 5 已接入登录</NTag>
+      <NTag type="success" round>阶段 7 知识内容主模块</NTag>
       <NH1>欢迎回来，{{ authStore.currentUser?.displayName }}</NH1>
       <NP>
-        这里是部门内部知识库首页。当前已经接入登录、JWT 鉴权、路由守卫和后台入口，下一阶段会开始接入分类和标签。
+        这里是部门内部知识库首页。现在已经可以创建知识、保存草稿、发布文章、浏览列表和查看详情。
       </NP>
       <NSpace>
-        <NButton type="primary">创建知识</NButton>
-        <NButton>浏览知识库</NButton>
+        <NButton type="primary" @click="router.push({ name: 'knowledge-create' })">创建知识</NButton>
+        <NButton @click="router.push({ name: 'knowledge-list' })">浏览知识库</NButton>
         <NButton v-if="authStore.isAdmin" secondary @click="router.push({ name: 'admin-users' })">
           进入后台
         </NButton>
@@ -32,10 +32,10 @@ const authStore = useAuthStore();
         </NCard>
       </NGi>
       <NGi>
-        <NCard title="最新知识">等待接入知识列表接口。</NCard>
+        <NCard title="最新知识">进入知识库页面查看已发布内容。</NCard>
       </NGi>
       <NGi>
-        <NCard title="热门标签">等待接入标签模块。</NCard>
+        <NCard title="下一步">接入 Vditor、Markdown 渲染和更完整的搜索筛选。</NCard>
       </NGi>
     </NGrid>
   </main>

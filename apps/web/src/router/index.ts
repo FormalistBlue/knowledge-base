@@ -5,6 +5,9 @@ import MainLayout from '@/layouts/MainLayout.vue';
 import AdminTaxonomyPage from '@/pages/AdminTaxonomyPage.vue';
 import AdminUsersPage from '@/pages/AdminUsersPage.vue';
 import HomePage from '@/pages/HomePage.vue';
+import KnowledgeDetailPage from '@/pages/KnowledgeDetailPage.vue';
+import KnowledgeEditorPage from '@/pages/KnowledgeEditorPage.vue';
+import KnowledgeListPage from '@/pages/KnowledgeListPage.vue';
 import LoginPage from '@/pages/LoginPage.vue';
 import UnauthorizedPage from '@/pages/UnauthorizedPage.vue';
 import { useAuthStore } from '@/stores/auth';
@@ -27,6 +30,30 @@ const router = createRouter({
           path: '',
           name: 'home',
           component: HomePage,
+          meta: { requiresAuth: true },
+        },
+        {
+          path: 'knowledge',
+          name: 'knowledge-list',
+          component: KnowledgeListPage,
+          meta: { requiresAuth: true },
+        },
+        {
+          path: 'knowledge/create',
+          name: 'knowledge-create',
+          component: KnowledgeEditorPage,
+          meta: { requiresAuth: true },
+        },
+        {
+          path: 'knowledge/:id',
+          name: 'knowledge-detail',
+          component: KnowledgeDetailPage,
+          meta: { requiresAuth: true },
+        },
+        {
+          path: 'knowledge/:id/edit',
+          name: 'knowledge-edit',
+          component: KnowledgeEditorPage,
           meta: { requiresAuth: true },
         },
       ],
