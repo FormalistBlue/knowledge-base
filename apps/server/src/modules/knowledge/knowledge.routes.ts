@@ -33,12 +33,18 @@ const listQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
   keyword: z.string().trim().optional(),
   categoryId: z.string().trim().min(1).optional(),
+  includeChildren: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((value) => value === 'true'),
   tagIds: z
     .string()
     .trim()
     .optional()
     .transform((value) => value?.split(',').map((item) => item.trim()).filter(Boolean) ?? []),
   status: z.nativeEnum(KnowledgeStatus).optional(),
+  publishedFrom: z.coerce.date().optional(),
+  publishedTo: z.coerce.date().optional(),
   sortBy: z.enum(['publishedAt', 'viewCount', 'updatedAt']).default('publishedAt'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
   onlyMine: z
@@ -62,6 +68,35 @@ const relationInclude = {
   comments: { where: { deletedAt: null } },
   attachments: { where: { deletedAt: null } },
 };
+
+const addEndOfDay = (date: Date) => {
+  const next = new Date(date);
+  next.setHours(23, 59, 59, 999);
+  return next;
+};
+
+const getCategoryDescendantIds = async (categoryId: string) => {
+  const categories = await prisma.category.findMany({ where: { deletedAt: null }, select: { id: true, parentId: true } });
+  const ids = new Set([categoryId]);
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+    for (const category of categories) {
+      if (category.parentId && ids.has(category.parentId) && !ids.has(category.id)) {
+        ids.add(category.id);
+        changed = true;
+      }
+    }
+  }
+
+  return [...ids];
+};
+
+const publishedWhere = {
+  deletedAt: null,
+  status: KnowledgeStatus.PUBLISHED,
+} satisfies Prisma.KnowledgeItemWhereInput;
 
 const ensureCategoryExists = async (categoryId: string) => {
   const category = await prisma.category.findFirst({ where: { id: categoryId, deletedAt: null } });
@@ -210,23 +245,33 @@ knowledgeRouter.get(
   validate({ query: listQuerySchema }),
   asyncHandler(async (req, res) => {
     const currentUser = req.currentUser!;
-    const { page, pageSize, keyword, categoryId, tagIds, status, sortBy, sortOrder, onlyMine } =
+    const { page, pageSize, keyword, categoryId, includeChildren, tagIds, status, publishedFrom, publishedTo, sortBy, sortOrder, onlyMine } =
       req.query as unknown as z.infer<typeof listQuerySchema>;
+    const categoryIds = categoryId && includeChildren ? await getCategoryDescendantIds(categoryId) : undefined;
+    const publishedAt: Prisma.DateTimeNullableFilter | undefined =
+      publishedFrom || publishedTo
+        ? {
+            ...(publishedFrom ? { gte: publishedFrom } : {}),
+            ...(publishedTo ? { lte: addEndOfDay(publishedTo) } : {}),
+          }
+        : undefined;
 
     const where: Prisma.KnowledgeItemWhereInput = {
       deletedAt: null,
       ...(onlyMine ? { authorId: currentUser.id } : {}),
-      ...(categoryId ? { categoryId } : {}),
+      ...(categoryId ? { categoryId: categoryIds ? { in: categoryIds } : categoryId } : {}),
+      ...(publishedAt ? { publishedAt } : {}),
       ...(keyword
         ? {
             OR: [
               { title: { contains: keyword, mode: 'insensitive' } },
+              { summary: { contains: keyword, mode: 'insensitive' } },
               { content: { contains: keyword, mode: 'insensitive' } },
               { tags: { some: { tag: { name: { contains: keyword, mode: 'insensitive' }, deletedAt: null } } } },
             ],
           }
         : {}),
-      ...(tagIds.length > 0 ? { tags: { some: { tagId: { in: tagIds } } } } : {}),
+      ...(tagIds.length > 0 ? { tags: { some: { tagId: { in: tagIds }, tag: { deletedAt: null } } } } : {}),
     };
 
     if (onlyMine || currentUser.role === UserRole.ADMIN) {
@@ -254,6 +299,43 @@ knowledgeRouter.get(
       pageSize,
       total,
       totalPages: Math.ceil(total / pageSize),
+    });
+  }),
+);
+
+knowledgeRouter.get(
+  '/home',
+  asyncHandler(async (_req, res) => {
+    const [pinned, latest, popular, categories, tags] = await prisma.$transaction([
+      prisma.knowledgeItem.findMany({ where: { ...publishedWhere, isPinned: true }, include: relationInclude, orderBy: [{ updatedAt: 'desc' }], take: 6 }),
+      prisma.knowledgeItem.findMany({ where: publishedWhere, include: relationInclude, orderBy: [{ publishedAt: 'desc' }, { updatedAt: 'desc' }], take: 8 }),
+      prisma.knowledgeItem.findMany({ where: publishedWhere, include: relationInclude, orderBy: [{ viewCount: 'desc' }, { updatedAt: 'desc' }], take: 8 }),
+      prisma.category.findMany({ where: { deletedAt: null }, orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }], include: { _count: { select: { items: { where: publishedWhere } } } }, take: 12 }),
+      prisma.tag.findMany({ where: { deletedAt: null }, orderBy: [{ updatedAt: 'desc' }], include: { _count: { select: { items: { where: { knowledge: publishedWhere } } } } }, take: 20 }),
+    ]);
+
+    sendSuccess(res, {
+      pinned: pinned.map(toKnowledgeSummary),
+      latest: latest.map(toKnowledgeSummary),
+      popular: popular.map(toKnowledgeSummary),
+      categories: categories.map((category) => ({
+        id: category.id,
+        name: category.name,
+        parentId: category.parentId,
+        sortOrder: category.sortOrder,
+        knowledgeCount: category._count.items,
+      })),
+      tags: tags
+        .map((tag) => ({
+          id: tag.id,
+          name: tag.name,
+          normalizedName: tag.normalizedName,
+          createdById: tag.createdById,
+          createdAt: tag.createdAt,
+          updatedAt: tag.updatedAt,
+          knowledgeCount: tag._count.items,
+        }))
+        .sort((first, second) => second.knowledgeCount - first.knowledgeCount),
     });
   }),
 );

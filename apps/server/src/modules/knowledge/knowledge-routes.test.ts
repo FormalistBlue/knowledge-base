@@ -33,12 +33,12 @@ const authHeaderFor = (user: { id: string; role: UserRole; tokenVersion: number 
   return `Bearer ${signToken({ sub: user.id, role: user.role, tokenVersion: user.tokenVersion })}`;
 };
 
-const createCategory = async (name = `Knowledge Category ${unique()}`) => {
+const createCategory = async (name = `Knowledge Category ${unique()}`, parentId: string | null = null) => {
   const category = await prisma.category.create({
     data: {
       name,
-      parentId: null,
-      activeKey: makeActiveCategoryKey(null, name),
+      parentId,
+      activeKey: makeActiveCategoryKey(parentId, name),
       sortOrder: 0,
     },
   });
@@ -62,22 +62,34 @@ const createKnowledge = async ({
   categoryId,
   status = KnowledgeStatus.PUBLISHED,
   title = `Knowledge ${unique()}`,
+  summary = 'Knowledge summary',
+  content = '# Knowledge content',
+  publishedAt,
+  viewCount = 0,
+  isPinned = false,
 }: {
   authorId: string;
   categoryId: string;
   status?: KnowledgeStatus;
   title?: string;
+  summary?: string;
+  content?: string;
+  publishedAt?: Date;
+  viewCount?: number;
+  isPinned?: boolean;
 }) => {
   const knowledge = await prisma.knowledgeItem.create({
     data: {
       title,
-      summary: 'Knowledge summary',
-      content: '# Knowledge content',
+      summary,
+      content,
       status,
       categoryId,
       authorId,
-      publishedAt: status === KnowledgeStatus.PUBLISHED ? new Date() : null,
+      publishedAt: status === KnowledgeStatus.PUBLISHED ? (publishedAt ?? new Date()) : null,
       archivedAt: status === KnowledgeStatus.ARCHIVED ? new Date() : null,
+      viewCount,
+      isPinned,
     },
   });
   createdKnowledgeIds.push(knowledge.id);
@@ -113,8 +125,97 @@ afterEach(async () => {
   await prisma.attachment.deleteMany({ where: { knowledgeId: { in: createdKnowledgeIds } } });
   await prisma.knowledgeItem.deleteMany({ where: { id: { in: createdKnowledgeIds } } });
   await prisma.tag.deleteMany({ where: { id: { in: createdTagIds } } });
-  await prisma.category.deleteMany({ where: { id: { in: createdCategoryIds } } });
+  for (const categoryId of [...createdCategoryIds].reverse()) {
+    await prisma.category.deleteMany({ where: { id: categoryId } });
+  }
   await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
+});
+
+describe('knowledge search and home routes', () => {
+  it('filters by keyword, child categories, tags, published date range, and keeps pinned items first', async () => {
+    const author = await createUser(UserRole.USER);
+    const rootCategory = await createCategory('Engineering');
+    const childCategory = await createCategory('Frontend', rootCategory.id);
+    const otherCategory = await createCategory('Operations');
+    const vueTag = await createTag(`vue-${unique()}`);
+    const opsTag = await createTag(`ops-${unique()}`);
+    const earlyDate = new Date('2024-01-10T00:00:00.000Z');
+    const laterDate = new Date('2024-02-10T00:00:00.000Z');
+
+    const childKnowledge = await createKnowledge({
+      authorId: author.id,
+      categoryId: childCategory.id,
+      title: 'Component Playbook',
+      summary: 'Reusable UI component rules',
+      content: 'Design tokens and props guidance',
+      publishedAt: laterDate,
+      viewCount: 10,
+      isPinned: true,
+    });
+    const rootKnowledge = await createKnowledge({
+      authorId: author.id,
+      categoryId: rootCategory.id,
+      title: 'Architecture Notes',
+      content: 'Component ownership and review flow',
+      publishedAt: earlyDate,
+      viewCount: 20,
+    });
+    const otherKnowledge = await createKnowledge({
+      authorId: author.id,
+      categoryId: otherCategory.id,
+      title: 'Runbook',
+      content: 'Operations checklist',
+      publishedAt: laterDate,
+      viewCount: 30,
+    });
+    await prisma.knowledgeTag.createMany({
+      data: [
+        { knowledgeId: childKnowledge.id, tagId: vueTag.id },
+        { knowledgeId: rootKnowledge.id, tagId: vueTag.id },
+        { knowledgeId: otherKnowledge.id, tagId: opsTag.id },
+      ],
+    });
+
+    const response = await request(app)
+      .get('/api/knowledge')
+      .query({
+        keyword: 'component',
+        categoryId: rootCategory.id,
+        includeChildren: 'true',
+        tagIds: vueTag.id,
+        publishedFrom: '2024-01-01',
+        publishedTo: '2024-12-31',
+        sortBy: 'viewCount',
+        sortOrder: 'desc',
+      })
+      .set('Authorization', authHeaderFor(author))
+      .expect(200);
+
+    expect(response.body.data.items.map((item: { id: string }) => item.id)).toEqual([childKnowledge.id, rootKnowledge.id]);
+    expect(response.body.data.total).toBe(2);
+  });
+
+  it('returns home sections for pinned, latest, popular, categories, and tags', async () => {
+    const author = await createUser(UserRole.USER);
+    const category = await createCategory('Home Category');
+    const tag = await createTag(`home-${unique()}`);
+    const pinned = await createKnowledge({ authorId: author.id, categoryId: category.id, title: 'Pinned Knowledge', isPinned: true, viewCount: 5 });
+    const popular = await createKnowledge({ authorId: author.id, categoryId: category.id, title: 'Popular Knowledge', viewCount: 99 });
+    await prisma.knowledgeTag.createMany({
+      data: [
+        { knowledgeId: pinned.id, tagId: tag.id },
+        { knowledgeId: popular.id, tagId: tag.id },
+      ],
+    });
+
+    const response = await request(app).get('/api/knowledge/home').set('Authorization', authHeaderFor(author)).expect(200);
+
+    expect(response.body.data.pinned.some((item: { id: string }) => item.id === pinned.id)).toBe(true);
+    expect(response.body.data.latest.some((item: { id: string }) => item.id === popular.id)).toBe(true);
+    expect(response.body.data.popular[0].viewCount).toBeGreaterThanOrEqual(response.body.data.popular.at(-1).viewCount);
+    expect(response.body.data.categories.some((item: { id: string; knowledgeCount: number }) => item.id === category.id && item.knowledgeCount >= 2)).toBe(true);
+    expect(response.body.data.tags.some((item: { id: string; knowledgeCount: number }) => item.id === tag.id && item.knowledgeCount >= 2)).toBe(true);
+  });
 });
 
 describe('knowledge CRUD routes', () => {

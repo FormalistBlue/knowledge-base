@@ -102,6 +102,37 @@ body {
   margin-bottom: 0;
 }
 
+.filter-control {
+  width: 220px;
+}
+
+.filter-wide {
+  width: 320px;
+}
+
+.home-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.knowledge-card-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.knowledge-mini-card {
+  min-height: 150px;
+  cursor: pointer;
+}
+
+.knowledge-mini-card:hover {
+  border-color: rgba(99, 102, 241, 0.45);
+}
+
 .page-hero.compact {
   padding: 30px;
 }
@@ -139,6 +170,12 @@ body {
   border: 1px solid rgba(47, 93, 80, 0.14);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.48);
+}
+
+.image-card__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .attachment-uploader,

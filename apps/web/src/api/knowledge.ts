@@ -1,15 +1,29 @@
 import { http, type ApiResponse } from './http';
-import type { KnowledgeDetail, KnowledgeListParams, KnowledgeListResult, KnowledgePayload, KnowledgeStatus, KnowledgeSummary } from '@/types/knowledge';
+import type {
+  KnowledgeDetail,
+  KnowledgeHomeResult,
+  KnowledgeListParams,
+  KnowledgeListResult,
+  KnowledgePayload,
+  KnowledgeStatus,
+  KnowledgeSummary,
+} from '@/types/knowledge';
 
 const toQueryParams = (params: KnowledgeListParams = {}) => ({
   ...params,
   tagIds: params.tagIds?.join(','),
+  includeChildren: params.includeChildren === undefined ? undefined : String(params.includeChildren),
   onlyMine: params.onlyMine === undefined ? undefined : String(params.onlyMine),
 });
 
 export const knowledgeApi = {
   async list(params: KnowledgeListParams = {}): Promise<KnowledgeListResult> {
     const response = await http.get<unknown, ApiResponse<KnowledgeListResult>>('/knowledge', { params: toQueryParams(params) });
+    return response.data;
+  },
+
+  async home(): Promise<KnowledgeHomeResult> {
+    const response = await http.get<unknown, ApiResponse<KnowledgeHomeResult>>('/knowledge/home');
     return response.data;
   },
 

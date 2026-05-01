@@ -57,8 +57,11 @@ export type KnowledgeListParams = {
   pageSize?: number;
   keyword?: string;
   categoryId?: string;
+  includeChildren?: boolean;
   tagIds?: string[];
   status?: KnowledgeStatus;
+  publishedFrom?: string;
+  publishedTo?: string;
   sortBy?: 'publishedAt' | 'viewCount' | 'updatedAt';
   sortOrder?: 'asc' | 'desc';
   onlyMine?: boolean;
@@ -70,4 +73,24 @@ export type KnowledgeListResult = {
   pageSize: number;
   total: number;
   totalPages: number;
+};
+
+export type KnowledgeHomeCategory = {
+  id: string;
+  name: string;
+  parentId: string | null;
+  sortOrder: number;
+  knowledgeCount: number;
+};
+
+export type KnowledgeHomeTag = TagItem & {
+  knowledgeCount: number;
+};
+
+export type KnowledgeHomeResult = {
+  pinned: KnowledgeSummary[];
+  latest: KnowledgeSummary[];
+  popular: KnowledgeSummary[];
+  categories: KnowledgeHomeCategory[];
+  tags: KnowledgeHomeTag[];
 };
