@@ -1,6 +1,6 @@
 import type { Tag } from '@prisma/client';
 
-export const normalizeTagName = (name: string) => name.trim().toLowerCase();
+export { normalizeTagName } from './taxonomy-presenter.js';
 
 export const toTagResponse = (tag: Tag) => ({
   id: tag.id,

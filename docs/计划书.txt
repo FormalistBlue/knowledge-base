@@ -1,0 +1,1334 @@
+    一、项目目标
+    
+    第一版目标：
+    
+    - 管理员可以创建、禁用、重置用户密码
+    - 用户通过用户名 + 密码登录
+    - 所有登录用户都可以查看所有知识
+    - 普通用户可以发布、编辑、删除自己的知识
+    - 管理员可以管理所有知识
+    - 知识支持多级分类、标签、Markdown 所见即所得编辑、摘要、图片、附件
+    - 支持标题、正文、标签的简单模糊搜索
+    - 支持按分类、标签、发布时间筛选
+    - 支持点赞、收藏、浏览数、一级评论和评论回复
+    - 支持站内通知
+    - 支持后台管理和基础统计
+    - 支持暗色模式
+    - 使用 Docker Compose 部署到云服务器
+    
+    一点五、已确认关键决策
+
+    - 项目名称：knowledge-base
+    - Markdown 编辑器：Vditor
+    - 登录 token 存储：localStorage
+    - JWT 有效期：20 天
+    - 用户修改密码或管理员重置密码后，旧 token 立即失效
+    - 删除策略：文章、评论、附件均使用软删除；第一版不做恢复页面
+    - 草稿可见范围：作者和管理员可见
+    - 归档文章：列表默认不显示，但所有登录用户仍可通过详情访问
+    - 浏览数：做简单防刷，同一用户同一天同一文章只计一次
+    - 评论层级：只支持两层，即评论 + 回复；删除父评论时子回复一起软删除
+    - 文件上传：支持临时上传，文章保存后再绑定
+    - 图片和附件：统一存入 attachments 表，通过 usageType 区分
+    - 附件预览：图片和 PDF 可预览，Office 文件和压缩包第一版只下载
+    - 标签去重：Vue 和 vue 视为同一个标签，保存时 trim，并用小写 normalizedName 唯一约束去重
+    - 分类删除：有子分类或有文章绑定时禁止删除
+    - 标签删除：自动解除文章关联，再软删除标签
+    - 发布时间筛选：使用 published_at，排序可支持 published_at / updated_at
+    - 首页热门知识：按浏览数排序
+    - 通知：支持已读和删除，删除使用软删除
+    - 管理员重置密码：管理员手动输入新密码
+    - 用户改密：保留用户自己修改密码功能
+    - 审计日志：只记录关键操作
+    - 详细开发文档：personal/docs/知识库开发文档.md
+
+    二、最终技术选型
+    
+    前端：
+    
+    - Vue 3
+    - TypeScript
+    - Vite
+    - Naive UI
+    - Pinia
+    - Vue Router
+    - Axios
+    - Markdown 编辑器：Vditor（Markdown + 所见即所得）
+    - Markdown 渲染：编辑器自带或 markdown-it
+    - XSS 清理：DOMPurify
+    
+    后端：
+    
+    - Node.js
+    - Express
+    - TypeScript
+    - Prisma
+    - PostgreSQL
+    - Zod
+    - JWT
+    - bcrypt
+    - Multer
+    - Pino 或 Winston
+    - Swagger / OpenAPI
+    
+    部署：
+    
+    - Docker
+    - Docker Compose
+    - Nginx
+    - HTTPS
+    - PostgreSQL 容器
+    - 本地文件存储挂载 volume
+    
+    我建议后端先用 Express，不用 NestJS。因为你的目标是理解后端流程，Express 的抽象少，更适合入门。
+    
+    三、推荐仓库结构
+    
+    建议使用 monorepo，一个仓库放前后端：
+    
+    text
+    knowledge-base/
+      apps/
+        web/
+          src/
+            api/
+            assets/
+            components/
+            layouts/
+            pages/
+            router/
+            stores/
+            types/
+            utils/
+            main.ts
+        server/
+          src/
+            config/
+            middlewares/
+            modules/
+              auth/
+              users/
+              categories/
+              tags/
+              knowledge/
+              comments/
+              favorites/
+              likes/
+              notifications/
+              files/
+              stats/
+              admin/
+            utils/
+            app.ts
+            server.ts
+          prisma/
+            schema.prisma
+            seed.ts
+      packages/
+        shared/
+          src/
+            types/
+            constants/
+      docker/
+        nginx/
+          nginx.conf
+      docker-compose.yml
+      .env.example
+      README.md
+    
+    
+    为什么这样分：
+    
+    - apps/web：前端应用
+    - apps/server：后端服务
+    - packages/shared：前后端共享类型、常量
+    - docker：部署相关配置
+    - docker-compose.yml：一键启动数据库、后端、前端、Nginx
+    
+    学习重点：
+    
+    - 前端项目和后端项目如何协作
+    - API 如何连接前后端
+    - 环境变量如何区分开发和生产
+    - Docker 如何把多个服务组合起来
+    
+    四、核心数据模型
+    
+    第一版可以设计这些表。
+    
+    用户表：
+    
+    text
+    users
+    - id
+    - username（唯一）
+    - password_hash
+    - display_name
+    - role: admin | user
+    - status: active | disabled
+    - created_at
+    - updated_at
+    
+    
+    分类表：
+    
+    text
+    categories
+    - id
+    - name
+    - parent_id
+    - sort_order
+    - created_at
+    - updated_at
+    
+    
+    标签表：
+    
+    text
+    tags
+    - id
+    - name（建议唯一，至少同名标签要有明确合并策略）
+    - created_by
+    - created_at
+    - updated_at
+    
+    
+    知识表：
+    
+    text
+    knowledge_items
+    - id
+    - title
+    - summary
+    - content
+    - status: draft | published | archived
+    - category_id
+    - author_id
+    - is_pinned
+    - view_count
+    - published_at
+    - created_at
+    - updated_at
+    
+    
+    知识标签关联表：
+    
+    text
+    knowledge_tags
+    - knowledge_id
+    - tag_id
+    - unique(knowledge_id, tag_id)
+    
+    
+    点赞表：
+    
+    text
+    knowledge_likes
+    - id
+    - knowledge_id
+    - user_id
+    - created_at
+    - unique(knowledge_id, user_id)
+    
+    
+    收藏表：
+    
+    text
+    knowledge_favorites
+    - id
+    - knowledge_id
+    - user_id
+    - created_at
+    - unique(knowledge_id, user_id)
+    
+    
+    评论表：
+    
+    text
+    comments
+    - id
+    - knowledge_id
+    - user_id
+    - parent_id
+    - content
+    - created_at
+    - updated_at
+    
+    
+    附件表：
+    
+    text
+    attachments
+    - id
+    - knowledge_id
+    - uploader_id
+    - original_name
+    - file_name
+    - file_path
+    - file_size
+    - mime_type
+    - created_at
+    
+    
+    通知表：
+    
+    text
+    notifications
+    - id
+    - user_id
+    - type
+    - title
+    - content
+    - related_id
+    - is_read
+    - created_at
+    
+    
+    统计不一定单独建表，第一版可以通过查询实时算：
+    
+    - 文章数量
+    - 用户数量
+    - 总浏览量
+    - 附件数量
+
+
+    审计日志表：
+
+    text
+    audit_logs
+    - id
+    - actor_id
+    - action
+    - target_type
+    - target_id
+    - summary
+    - metadata
+    - created_at
+
+    第一版只记录关键操作，例如创建用户、禁用用户、重置密码、删除文章、删除评论、删除分类、删除标签、置顶文章、管理员修改文章分类或标签。
+    
+    
+    关键约束和索引建议：
+    
+    - users.username 必须唯一
+    - categories.parent_id 要避免循环引用
+    - tags.name 建议唯一，避免同一个标签重复出现
+    - knowledge_tags 使用 knowledge_id + tag_id 联合唯一
+    - knowledge_likes、knowledge_favorites 使用 knowledge_id + user_id 联合唯一，防止重复点赞和重复收藏
+    - knowledge_items.status、category_id、author_id、published_at 建索引，方便列表筛选和排序
+    - comments.knowledge_id、comments.parent_id 建索引，方便查询评论列表和回复
+    - attachments.knowledge_id、attachments.uploader_id 建索引，方便查询文章附件和用户上传记录
+    - 删除策略要提前定：文章、评论、附件建议第一版优先软删除，避免误删后无法恢复
+    
+    学习重点：
+    
+    - 什么是一对多：用户和文章
+    - 什么是多对多：文章和标签
+    - 什么是自关联：分类 parent_id、评论 parent_id
+    - 什么是冗余字段：view_count
+    - 什么是关联表：knowledge_tags
+    
+    五、权限规则
+    
+    第一版不要做复杂 RBAC，直接用两个角色：
+    
+    管理员：
+    
+    - 创建用户
+    - 禁用用户
+    - 重置密码
+    - 管理分类
+    - 管理标签
+    - 管理所有文章
+    - 管理所有评论
+    - 查看统计
+    - 设置文章置顶
+    - 修改文章分类和标签
+    
+    普通用户：
+    
+    - 查看所有已发布知识
+    - 创建知识
+    - 编辑自己的知识
+    - 删除自己的知识
+    - 点赞
+    - 收藏
+    - 评论
+    - 回复评论
+    - 上传自己文章中的图片和附件
+    
+    接口权限判断可以这样理解：
+    
+    text
+    是否登录？ -> auth middleware
+    是不是管理员？ -> admin middleware
+    是不是文章作者？ -> owner check
+    
+    
+    学习重点：
+    
+    - 登录认证和权限授权不是一回事
+    - 认证：你是谁？
+    - 授权：你能做什么？
+    - 后端必须做权限判断，不能只靠前端隐藏按钮
+    
+    六、API 设计
+    
+    认证：
+    
+    text
+    POST /api/auth/login
+    POST /api/auth/logout
+    GET  /api/auth/me
+    POST /api/auth/change-password
+    
+    
+    用户管理：
+    
+    text
+    GET   /api/admin/users
+    POST  /api/admin/users
+    PATCH /api/admin/users/:id/status
+    POST  /api/admin/users/:id/reset-password
+    
+    
+    分类：
+    
+    text
+    GET    /api/categories
+    POST   /api/admin/categories
+    PUT    /api/admin/categories/:id
+    DELETE /api/admin/categories/:id
+    
+    
+    标签：
+    
+    text
+    GET    /api/tags
+    POST   /api/tags
+    PUT    /api/admin/tags/:id
+    DELETE /api/admin/tags/:id
+    
+    
+    知识：
+    
+    text
+    GET    /api/knowledge
+    GET    /api/knowledge/:id
+    POST   /api/knowledge
+    PUT    /api/knowledge/:id
+    DELETE /api/knowledge/:id
+    PATCH  /api/knowledge/:id/status
+    PATCH  /api/admin/knowledge/:id/pin
+    PATCH  /api/admin/knowledge/:id/category
+    PATCH  /api/admin/knowledge/:id/tags
+    
+    
+    点赞收藏：
+    
+    text
+    POST   /api/knowledge/:id/like
+    DELETE /api/knowledge/:id/like
+    POST   /api/knowledge/:id/favorite
+    DELETE /api/knowledge/:id/favorite
+    GET    /api/me/favorites
+    
+    
+    评论：
+    
+    text
+    GET    /api/knowledge/:id/comments
+    POST   /api/knowledge/:id/comments
+    DELETE /api/comments/:id
+    
+    
+    文件：
+    
+    text
+    POST /api/files/images
+    POST /api/files/attachments
+    GET  /api/files/:id/download
+    GET  /api/files/:id/preview
+    
+    
+    通知：
+    
+    text
+    GET   /api/notifications
+    PATCH /api/notifications/:id/read
+    PATCH /api/notifications/read-all
+    
+    
+    统计：
+    
+    text
+    GET /api/admin/stats/overview
+    
+    
+    学习重点：
+    
+    - REST API 如何按资源设计
+    - 为什么管理接口可以放在 /api/admin
+    - GET/POST/PUT/PATCH/DELETE 的区别
+    - 为什么文件上传接口单独设计
+    
+    七、前端页面规划
+    
+    普通页面：
+    
+    text
+    /login
+    /
+      首页
+    /knowledge
+      知识列表
+    /knowledge/create
+      创建知识
+    /knowledge/:id
+      知识详情
+    /knowledge/:id/edit
+      编辑知识
+    /favorites
+      我的收藏
+    /my/knowledge
+      我的知识
+    /notifications
+      通知中心
+    
+    
+    后台页面：
+    
+    text
+    /admin
+    /admin/users
+    /admin/categories
+    /admin/tags
+    /admin/knowledge
+    /admin/comments
+    /admin/stats
+    
+    
+    首页内容：
+    
+    - 最新知识
+    - 热门知识
+    - 置顶知识
+    - 分类入口
+    - 热门标签
+    
+    知识详情页：
+    
+    - 标题
+    - 摘要
+    - 作者
+    - 分类
+    - 标签
+    - 发布时间
+    - 更新时间
+    - 浏览数
+    - 点赞
+    - 收藏
+    - 正文
+    - 附件
+    - 评论区
+    
+    学习重点：
+    
+    - 前端路由和后端 API 的关系
+    - 登录态如何影响页面访问
+    - 权限如何影响按钮展示
+    - 列表页如何处理分页、筛选、搜索
+    
+    八、开发阶段计划
+    
+    阶段 1：项目初始化
+    
+    目标：
+    
+    - 创建 monorepo
+    - 初始化 Vue 3 项目
+    - 初始化 Express + TS 项目
+    - 配置 PostgreSQL
+    - 配置 Prisma
+    - 跑通第一个接口
+    
+    任务：
+    
+    1. 创建项目目录
+    2. 初始化 apps/web
+    3. 初始化 apps/server
+    4. 配置 TypeScript
+    5. 配置 ESLint / Prettier
+    6. 创建 docker-compose.yml
+    7. 启动 PostgreSQL
+    8. 配置 Prisma
+    9. 创建 /api/health 接口
+    10. 前端请求 /api/health
+    
+    验收标准：
+    
+    - 前端页面能启动
+    - 后端服务能启动
+    - PostgreSQL 能连接
+    - 访问 /api/health 返回正常
+    - 前端可以调用后端接口
+    
+    你会学到：
+    
+    - 前后端项目如何分开启动
+    - 后端服务是什么
+    - 数据库连接是什么
+    - Docker Compose 是怎么启动数据库的
+    - API 请求是怎么从浏览器到后端的
+    
+    阶段 2：用户和登录系统
+    
+    目标：
+    
+    - 管理员可以创建用户
+    - 用户可以登录
+    - 后端可以识别当前用户
+    
+    任务：
+    
+    1. 设计 users 表
+    2. 创建 Prisma migration
+    3. 写 seed 脚本创建初始管理员
+    4. 实现密码 hash
+    5. 实现登录接口
+    6. 实现 JWT 生成
+    7. 实现 auth middleware
+    8. 实现 /api/auth/me
+    9. 每次鉴权时查询用户状态，禁用用户即使 token 未过期也不能继续访问
+    10. 明确 token 过期时间，比如 2 小时或 1 天
+    11. 前端做登录页
+    12. 前端保存 token
+    13. 前端加路由守卫
+    14. 后台用户列表
+    15. 管理员创建用户
+    16. 管理员禁用用户
+    17. 管理员重置密码
+    
+    JWT 简化方案：
+    
+    - 第一版使用 20 天有效期的 access token，不做 refresh token
+    - token 放在 Authorization: Bearer 头里
+    - logout 第一版只做前端清除 token，不承诺服务端立即让 token 失效
+    - 如果后续需要真正的服务端登出，可以增加 token 黑名单、refresh token 轮换，或者改成 HttpOnly Cookie session
+    - 后端 auth middleware 每次都要检查用户是否存在、是否被禁用、密码重置后是否需要重新登录
+    
+    验收标准：
+    
+    - 管理员账号可以登录
+    - 登录后能获取当前用户
+    - 未登录不能访问内部接口
+    - 禁用账号不能登录
+    - 禁用账号已有 token 也不能继续访问接口
+    - 管理员可以创建和禁用用户
+    
+    你会学到：
+    
+    - 密码为什么不能明文存
+    - bcrypt 是什么
+    - JWT 是什么
+    - middleware 是什么
+    - 后端如何保护接口
+    - 前端如何处理登录态
+    
+    阶段 3：分类和标签
+    
+    目标：
+    
+    - 支持多级分类
+    - 支持用户创建标签
+    - 管理员可以维护分类和标签
+    
+    任务：
+    
+    1. 设计 categories 表
+    2. 实现分类树查询
+    3. 实现管理员创建分类
+    4. 实现管理员编辑分类
+    5. 实现管理员删除分类
+    6. 设计 tags 表
+    7. 实现标签列表
+    8. 实现普通用户创建标签
+    9. 实现管理员编辑/删除标签
+    10. 前端做分类管理页面
+    11. 前端做标签管理页面
+    12. 前端封装分类树选择组件
+    
+    验收标准：
+    
+    - 可以创建多级分类
+    - 知识发布时可以选择一个分类
+    - 用户可以创建标签
+    - 管理员可以维护标签
+    - 分类树显示正常
+    
+    你会学到：
+    
+    - 什么是树结构
+    - parent_id 是什么
+    - 前端树组件怎么和后端数据配合
+    - 管理员接口和普通接口如何区分
+    
+    阶段 4：知识发布和编辑
+    
+    目标：
+    
+    - 用户可以发布 Markdown 知识
+    - 支持摘要、分类、标签、状态
+    - 支持草稿、发布、归档
+    
+    任务：
+    
+    1. 设计 knowledge_items 表
+    2. 设计 knowledge_tags 表
+    3. 实现创建知识接口
+    4. 实现编辑知识接口
+    5. 实现删除知识接口
+    6. 实现知识详情接口
+    7. 实现知识列表接口
+    8. 实现状态切换
+    9. 实现作者权限判断
+    10. 管理员可编辑所有文章
+    11. 前端接入 Markdown 所见即所得编辑器
+    12. 前端创建知识页面
+    13. 前端编辑知识页面
+    14. 前端知识详情页
+    15. 前端知识列表页
+    
+    验收标准：
+    
+    - 普通用户可以创建文章
+    - 普通用户只能修改自己的文章
+    - 管理员可以修改所有文章
+    - 文章可以保存为草稿
+    - 文章可以发布
+    - 文章可以归档
+    - 详情页能正确渲染 Markdown
+    
+    你会学到：
+    
+    - CRUD 是什么
+    - 数据库关联写入怎么做
+    - 多对多标签如何保存
+    - 后端如何判断“是不是作者”
+    - Markdown 为什么要做 XSS 防护
+    
+    阶段 5：图片和附件上传
+    
+    目标：
+    
+    - 支持文章图片上传
+    - 支持 PDF、Word、Excel、压缩包附件
+    - 单文件限制 100MB
+    - 文件存储在服务器本地
+    
+    任务：
+    
+    1. 设计 attachments 表
+    2. 配置 Multer
+    3. 设置上传目录
+    4. 限制文件大小 100MB
+    5. 限制允许的文件类型
+    6. 实现图片上传接口
+    7. 实现附件上传接口
+    8. 实现附件下载接口
+    9. 实现附件预览接口
+    10. 下载和预览接口都要做登录鉴权
+    11. 上传文件使用服务端生成的安全文件名，不直接使用用户原始文件名作为存储路径
+    12. 校验文件扩展名、MIME 类型和实际文件特征，不能只相信前端传参
+    13. 限制单用户或全站上传总容量，避免磁盘被打满
+    14. 前端编辑器接入图片上传
+    15. 前端文章附件上传组件
+    16. 前端附件列表展示
+    
+    附件预览建议：
+    
+    - 图片：直接预览
+    - PDF：浏览器 iframe 预览
+    - Word/Excel：第一版可以先下载，不强行在线预览
+    - 压缩包：只下载
+    
+    这里要注意，你说“可以预览附件”，但 Word、Excel 的在线预览会复杂一些。MVP 建议先做到：
+    
+    - 图片可预览
+    - PDF 可预览
+    - Office 文件和压缩包可下载
+    
+    后续如果一定要 Office 预览，可以接 OnlyOffice、LibreOffice 转 PDF 或在线文档服务。
+    
+    验收标准：
+    
+    - 图片可以插入文章
+    - 附件可以上传
+    - 超过 100MB 会失败
+    - 非法文件类型会失败
+    - 未登录不能下载或预览附件
+    - 上传文件名不会造成路径穿越或覆盖已有文件
+    - PDF 可以预览
+    - 附件可以下载
+    
+    你会学到：
+    
+    - multipart/form-data 是什么
+    - 文件上传和普通 JSON 请求有什么区别
+    - 后端如何保存文件
+    - 数据库为什么只存文件路径和元数据
+    - 静态资源访问怎么配置
+    
+    阶段 6：搜索、筛选和排序
+    
+    目标：
+    
+    - 支持标题、正文、标签搜索
+    - 支持分类、标签、发布时间筛选
+    - 第一版只做简单模糊搜索
+    - 搜索结果默认按置顶、发布时间排序，标题命中可以适当优先
+    
+    任务：
+    
+    1. 实现关键词搜索
+    2. 搜索 title
+    3. 搜索 content
+    4. 搜索 tag name
+    5. 分类筛选
+    6. 标签筛选
+    7. 发布时间筛选
+    8. 分页
+    9. 置顶优先显示
+    10. 前端搜索框
+    11. 前端筛选栏
+    12. 前端分页组件
+    
+    简单搜索策略：
+    
+    text
+    keyword 同时匹配 title、content、tag name
+    title 命中可以排在更前
+    is_pinned = true 的内容优先显示
+    其余结果按 published_at 倒序显示
+    
+    
+    PostgreSQL 可以先用 contains / ILIKE。这个方案适合小数据量和入门阶段，不做复杂分词、拼音搜索或全文排序。后面数据量变大或搜索体验不够时，再升级 PostgreSQL 全文搜索、中文分词插件或 Elasticsearch。
+    
+    验收标准：
+    
+    - 可以通过关键词找到文章
+    - 可以按分类筛选
+    - 可以按标签筛选
+    - 可以按发布时间筛选
+    - 搜索结果分页正常
+    
+    你会学到：
+    
+    - query 参数怎么设计
+    - 分页怎么做
+    - 搜索为什么需要索引
+    - 简单搜索和全文搜索的区别
+    
+    阶段 7：点赞、收藏、浏览数
+    
+    目标：
+    
+    - 用户可以点赞
+    - 用户可以收藏
+    - 知识显示浏览数
+    - 首页可以展示热门知识
+    
+    任务：
+    
+    1. 设计 knowledge_likes 表
+    2. 设计 knowledge_favorites 表
+    3. 实现点赞接口
+    4. 实现取消点赞接口
+    5. 实现收藏接口
+    6. 实现取消收藏接口
+    7. 实现我的收藏接口
+    8. 知识详情访问时增加浏览数
+    9. 知识列表返回点赞数、收藏数、浏览数
+    10. 前端详情页接入点赞和收藏
+    11. 前端收藏页
+    12. 首页热门知识模块
+    
+    验收标准：
+    
+    - 同一个用户不能重复点赞同一篇文章
+    - 同一个用户不能重复收藏同一篇文章
+    - 知识详情页显示点赞、收藏、浏览数
+    - 我的收藏页面正常
+    - 热门知识能按浏览数或点赞数排序
+    
+    你会学到：
+    
+    - 唯一约束是什么
+    - 计数数据怎么处理
+    - 什么是幂等接口
+    - 用户行为数据如何建模
+    
+    阶段 8：评论和回复
+    
+    目标：
+    
+    - 支持一级评论
+    - 支持回复评论
+    - 评论支持 Markdown
+    - 管理员可以删除评论
+    
+    任务：
+    
+    1. 设计 comments 表
+    2. 支持 parent_id
+    3. 实现评论列表接口
+    4. 实现发表评论接口
+    5. 实现回复评论接口
+    6. 实现删除评论接口
+    7. 管理员可以删除任意评论
+    8. 用户可以删除自己的评论
+    9. 前端评论区
+    10. 前端回复评论
+    11. 评论 Markdown 渲染
+    12. 删除评论后处理展示状态
+    
+    验收标准：
+    
+    - 用户可以评论文章
+    - 用户可以回复评论
+    - 管理员可以删除所有评论
+    - 普通用户只能删除自己的评论
+    - 评论支持 Markdown 渲染
+    
+    你会学到：
+    
+    - 自关联结构
+    - 评论树和扁平评论的区别
+    - 删除评论是硬删除还是软删除
+    - 用户生成内容为什么要做 XSS 清理
+    
+    阶段 9：通知系统
+    
+    目标：
+    
+    - 提供站内通知
+    - 不接企业微信/飞书/钉钉
+    
+    通知场景建议第一版做：
+    
+    - 你的文章被评论
+    - 你的评论被回复
+    - 管理员重置了你的密码，可选
+    - 管理员修改了你的文章分类/标签，可选
+    
+    任务：
+    
+    1. 设计 notifications 表
+    2. 创建通知工具函数
+    3. 评论文章时通知作者
+    4. 回复评论时通知被回复人
+    5. 获取通知列表
+    6. 标记单条已读
+    7. 全部标记已读
+    8. 前端通知入口
+    9. 前端通知中心
+    10. 顶部未读数量
+    
+    验收标准：
+    
+    - 文章被评论时作者收到通知
+    - 评论被回复时原评论人收到通知
+    - 可以查看通知列表
+    - 可以标记已读
+    - 顶部显示未读数量
+    
+    你会学到：
+    
+    - 业务事件是什么
+    - 为什么通知要单独建表
+    - 如何避免自己评论自己也通知自己
+    - 未读数量怎么计算
+    
+    阶段 10：后台管理
+    
+    目标：
+    
+    - 管理员可以维护系统核心数据
+    
+    后台模块：
+    
+    - 用户管理
+    - 分类管理
+    - 标签管理
+    - 文章管理
+    - 评论管理
+    - 数据统计
+    
+    任务：
+    
+    1. 用户管理页
+    2. 创建用户弹窗
+    3. 禁用用户
+    4. 重置密码
+    5. 分类管理页
+    6. 标签管理页
+    7. 文章管理页
+    8. 管理员编辑文章分类/标签
+    9. 管理员置顶文章
+    10. 管理员删除文章
+    11. 评论管理页
+    12. 管理员删除评论
+    13. 数据统计页
+    
+    验收标准：
+    
+    - 管理员能完成所有管理动作
+    - 普通用户不能访问后台页面
+    - 普通用户调用 admin 接口会被拒绝
+    - 数据统计显示文章数、用户数、总浏览量、附件数
+    
+    你会学到：
+    
+    - 后台管理系统的常见设计
+    - 前端权限路由
+    - 后端 admin middleware
+    - 为什么前后端都要做权限控制
+    
+    阶段 11：UI 和体验优化
+    
+    目标：
+    
+    - 做成 Notion + 后台管理结合的风格
+    - 支持暗色模式
+    - 桌面优先
+    
+    建议风格：
+    
+    - 左侧分类树
+    - 顶部搜索
+    - 中间文章列表
+    - 详情页留白充足
+    - 编辑器全屏模式
+    - 后台使用 Naive UI 的表格和表单
+    - 暗色模式使用 Naive UI theme
+    
+    任务：
+    
+    1. 设计整体 layout
+    2. 登录页美化
+    3. 首页信息布局
+    4. 知识详情页排版
+    5. 编辑页体验优化
+    6. 后台页面统一样式
+    7. 暗色模式切换
+    8. 空状态
+    9. 加载状态
+    10. 错误状态
+    
+    验收标准：
+    
+    - 主要页面风格统一
+    - 暗色模式可切换
+    - 表格、表单、列表交互自然
+    - 无明显布局错乱
+    
+    你会学到：
+    
+    - UI 组件库如何组织中后台系统
+    - 暗色模式如何实现
+    - 空状态和 loading 为什么重要
+    - 产品可用性不只是功能完成
+    
+    阶段 12：部署上线
+    
+    目标：
+    
+    - 使用 Docker Compose 部署到当前云服务器
+    - 支持 HTTPS
+    - 后续可以迁移到公司内部服务器
+    
+    服务组成：
+    
+    text
+    nginx
+    web
+    server
+    postgres
+    
+    
+    生产部署结构：
+    
+    text
+    knowledge-base/
+      docker-compose.yml
+      .env
+      data/
+        postgres/
+        uploads/
+        backups/
+    
+    
+    任务：
+    
+    1. 写后端 Dockerfile
+    2. 写前端 Dockerfile
+    3. 配置 Nginx
+    4. 配置 HTTPS
+    5. 配置 docker-compose
+    6. 配置 PostgreSQL volume
+    7. 配置 uploads volume
+    8. 设置生产环境变量
+    9. 执行 Prisma migration
+    10. 启动服务
+    11. 验证登录
+    12. 验证上传
+    13. 配置数据库备份脚本
+    14. 配置 uploads 目录备份
+    15. 验证备份文件可以恢复
+    16. 验证 HTTPS
+    
+    备份方案：
+    
+    - PostgreSQL：每天使用 pg_dump 备份到 data/backups/postgres/
+    - 上传文件：每天备份 data/uploads/ 到 data/backups/uploads/
+    - 备份保留策略：本地保留最近 7 天，重要版本手动下载到本机或对象存储
+    - 恢复验证：至少写一份恢复步骤，能从 pg_dump 和 uploads 备份恢复出可用系统
+    - 第一版可以先用 cron + shell 脚本，不需要一开始就做复杂备份平台
+    
+    验收标准：
+    
+    - 域名可以访问前端
+    - API 正常工作
+    - 登录正常
+    - 上传文件正常
+    - 数据重启后不丢失
+    - 数据库和上传文件有可用备份
+    - 至少验证过一次备份恢复流程
+    - HTTPS 正常
+    
+    你会学到：
+    
+    - Dockerfile 是什么
+    - Docker Compose 是什么
+    - volume 为什么重要
+    - Nginx 如何转发前端和后端
+    - HTTPS 如何配置
+    - 生产环境和开发环境有什么区别
+    
+    九、开发顺序总览
+    
+    建议严格按这个顺序：
+    
+    text
+    1. 项目初始化
+    2. 数据库和 Prisma
+    3. 登录系统
+    4. 用户管理
+    5. 分类和标签
+    6. 知识发布和编辑
+    7. Markdown 编辑器
+    8. 图片和附件上传
+    9. 搜索和筛选
+    10. 点赞收藏浏览数
+    11. 评论和回复
+    12. 通知系统
+    13. 后台管理
+    14. 数据统计
+    15. UI 优化和暗色模式
+    16. Docker 部署
+    
+    
+    不要一开始做文件上传、通知、统计。先把“用户登录 + 发布知识 + 查看知识”这条主链路跑通。
+    
+    十、MVP 验收标准
+    
+    第一版完成后，应该可以做到：
+    
+    - 管理员创建用户
+    - 用户登录
+    - 用户发布 Markdown 知识
+    - 用户上传图片和附件
+    - 用户浏览所有已发布知识
+    - 用户搜索知识
+    - 用户按分类、标签筛选知识
+    - 用户点赞、收藏、评论
+    - 用户收到评论/回复通知
+    - 管理员管理用户、分类、标签、文章、评论
+    - 管理员查看基础统计
+    - 系统可以通过 Docker Compose 部署
+    - 系统支持 HTTPS
+    - 系统支持暗色模式
+    
+    十一、建议暂缓的功能
+    
+    这些功能你现在不需要做：
+    
+    - 多部门权限
+    - 完整 RBAC 权限系统
+    - 审核流程
+    - 历史版本回滚
+    - AI 问答
+    - Elasticsearch
+    - Office 在线编辑
+    - 实时协作
+    - 复杂自动备份平台
+    - 异地多副本备份
+    - 移动端适配
+    - 企业微信/飞书/钉钉集成
+    
+    这些不是不要，而是二期再做更合理。
+    
+    十二、几个重要提醒
+    
+    1. 附件预览别一开始做太重
+    
+    图片和 PDF 预览比较简单。Word、Excel、压缩包在线预览会明显复杂，建议第一版先提供下载。
+    
+    2. Markdown 必须做安全处理
+    
+    文章和评论都是用户输入，渲染成 HTML 时一定要防 XSS。
+    
+    前端可以用：
+    
+    text
+    DOMPurify
+    
+    
+    后端也可以对内容做必要限制。
+    
+    3. 权限必须以后端为准
+    
+    前端隐藏按钮只是体验优化，真正安全一定在后端判断。
+    
+    比如：
+    
+    - 普通用户不能删除别人的文章
+    - 普通用户不能访问 /api/admin
+    - 禁用用户不能登录
+    - 已登录 token 也要检查用户是否被禁用
+    
+    4. 文件上传要限制大小和类型
+    
+    你设定 100MB 很合理，但要注意：
+    
+    - Nginx 有上传大小限制
+    - Express/Multer 有上传大小限制
+    - 前端也要提示大小限制
+    - 文件名要由服务端重新生成，避免路径穿越、重名覆盖和特殊字符问题
+    - 文件类型要做服务端校验，不能只相信前端传来的 MIME 类型
+    - 下载和预览接口也要鉴权，不能把 uploads 目录无保护地暴露成公开目录
+    - 要限制总容量或至少监控磁盘空间
+    - Docker volume 要挂载，否则容器重启文件可能丢
+    
+    5. JWT 和登出策略要提前想清楚
+    
+    第一版可以用短有效期 JWT，并在前端 logout 时清除 token。
+    
+    但要知道：如果不做 token 黑名单或 session，后端无法让一个未过期的 JWT 立刻失效。所以 auth middleware 必须每次检查用户状态，禁用用户、删除用户、密码重置后要有明确处理策略。
+    
+    6. 备份不是二期功能
+    
+    只要部署到真实服务器并开始上传文件，就要有最基本的备份。
+    
+    第一版至少要做到：
+    
+    - PostgreSQL 可以通过 pg_dump 备份和恢复
+    - uploads 目录有定期备份
+    - 备份不要只放在容器内部
+    - 文档里写清楚恢复步骤
+    
+    7. 数据库迁移要从一开始就用 Prisma migration
+    
+    不要手动改数据库表。后端学习里，migration 是很重要的一环。
+    
+    十三、建议你的学习路径
+    
+    你是纯前端，所以我建议你重点理解这些后端概念：
+    
+    第一优先级：
+    
+    - HTTP 请求生命周期
+    - Express 路由
+    - 中间件
+    - 数据库表设计
+    - Prisma CRUD
+    - 登录和 JWT
+    - 权限判断
+    - 参数校验
+    - 错误处理
+    
+    第二优先级：
+    
+    - 文件上传
+    - 分页搜索
+    - Docker 部署
+    - Nginx 反向代理
+    - 日志
+    - HTTPS
+    
+    第三优先级：
+    
+    - 性能优化
+    - 数据库索引
+    - 事务
+    - 全文搜索
+    - 备份恢复演练
+    - CI/CD
+    
+    十四、推荐开发节奏
+    
+    如果你每天投入 1-2 小时：
+    
+    第一周：
+    
+    - 项目初始化
+    - PostgreSQL + Prisma
+    - 登录系统
+    - 用户管理
+    
+    第二周：
+    
+    - 分类标签
+    - 知识 CRUD
+    - Markdown 编辑器
+    - 知识详情页
+    
+    第三周：
+    
+    - 图片附件
+    - 搜索筛选
+    - 点赞收藏
+    - 评论
+    
+    第四周：
+    
+    - 通知
+    - 后台管理
+    - 统计
+    - UI 优化
+    - Docker 部署
+    
+    如果时间比较碎，可以按 6-8 周做，不要赶。
+    
+    十五、我建议的第一步
+    
+    下一步不要急着写所有功能。
+    
+    建议先做第一个可运行里程碑：
+    
+    “本地启动前端、后端、数据库，管理员可以登录，登录后看到首页。”
+    
+    这个里程碑虽然功能少，但它会打通：
+    
+    - 前端
+    - 后端
+    - 数据库
+    - 登录
+    - token
+    - 路由守卫
+    - 环境变量
+    - API 请求
+    
+    这就是全栈项目最核心的第一条线。
+    
+    之后所有功能都是在这条线上往外扩展。

@@ -9,6 +9,7 @@ import { asyncHandler } from '../../utils/async-handler.js';
 import { prisma } from '../../utils/prisma.js';
 import { sendSuccess } from '../../utils/response.js';
 import { buildCategoryTree, toCategoryNode } from './category-presenter.js';
+import { makeActiveCategoryKey, makeDeletedCategoryKey } from './taxonomy-presenter.js';
 
 export const categoriesRouter = Router();
 export const adminCategoriesRouter = Router();
@@ -73,14 +74,13 @@ adminCategoriesRouter.post(
     const normalizedParentId = parentId ?? null;
     await assertParentIsValid(null, normalizedParentId);
 
-    const existing = await prisma.category.findFirst({
-      where: { name, parentId: normalizedParentId, deletedAt: null },
-    });
+    const activeKey = makeActiveCategoryKey(normalizedParentId, name);
+    const existing = await prisma.category.findUnique({ where: { activeKey } });
     if (existing) {
       throw new AppError('CONFLICT', '同级分类名称已存在', 409);
     }
 
-    const category = await prisma.category.create({ data: { name, parentId: normalizedParentId, sortOrder } });
+    const category = await prisma.category.create({ data: { name, parentId: normalizedParentId, activeKey, sortOrder } });
     sendSuccess(res, { category: toCategoryNode(category) }, 'created', 201);
   }),
 );
@@ -100,16 +100,15 @@ adminCategoriesRouter.put(
 
     await assertParentIsValid(id, normalizedParentId);
 
-    const duplicate = await prisma.category.findFirst({
-      where: { id: { not: id }, name, parentId: normalizedParentId, deletedAt: null },
-    });
-    if (duplicate) {
+    const activeKey = makeActiveCategoryKey(normalizedParentId, name);
+    const duplicate = await prisma.category.findUnique({ where: { activeKey } });
+    if (duplicate && duplicate.id !== id) {
       throw new AppError('CONFLICT', '同级分类名称已存在', 409);
     }
 
     const updatedCategory = await prisma.category.update({
       where: { id },
-      data: { name, parentId: normalizedParentId, sortOrder },
+      data: { name, parentId: normalizedParentId, activeKey, sortOrder },
     });
 
     sendSuccess(res, { category: toCategoryNode(updatedCategory) });
@@ -137,7 +136,7 @@ adminCategoriesRouter.delete(
       throw new AppError('CONFLICT', '分类下存在知识内容，不能删除', 409);
     }
 
-    await prisma.category.update({ where: { id }, data: { deletedAt: new Date() } });
+    await prisma.category.update({ where: { id }, data: { activeKey: makeDeletedCategoryKey(id), deletedAt: new Date() } });
     await prisma.auditLog.create({
       data: {
         actorId: req.currentUser!.id,

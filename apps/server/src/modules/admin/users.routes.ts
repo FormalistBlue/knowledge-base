@@ -1,4 +1,4 @@
-import { AuditAction, UserRole, UserStatus } from '@prisma/client';
+import { AuditAction, UserRole, UserStatus, type Prisma } from '@prisma/client';
 import { Router } from 'express';
 import { z } from 'zod';
 
@@ -20,12 +20,20 @@ const createUserSchema = z.object({
   role: z.nativeEnum(UserRole).default(UserRole.USER),
 });
 
+const listUsersQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  keyword: z.string().trim().optional(),
+  status: z.nativeEnum(UserStatus).optional(),
+  role: z.nativeEnum(UserRole).optional(),
+});
+
 const updateStatusSchema = z.object({
   status: z.nativeEnum(UserStatus),
 });
 
 const resetPasswordSchema = z.object({
-  password: z.string().min(8),
+  newPassword: z.string().min(8),
 });
 
 const idParamsSchema = z.object({
@@ -36,13 +44,40 @@ adminUsersRouter.use(requireAuth, requireAdmin);
 
 adminUsersRouter.get(
   '/',
-  asyncHandler(async (_req, res) => {
-    const users = await prisma.user.findMany({
-      where: { deletedAt: null },
-      orderBy: { createdAt: 'desc' },
-    });
+  validate({ query: listUsersQuerySchema }),
+  asyncHandler(async (req, res) => {
+    const { page, pageSize, keyword, role, status } = req.query as unknown as z.infer<typeof listUsersQuerySchema>;
+    const where: Prisma.UserWhereInput = {
+      deletedAt: null,
+      ...(role ? { role } : {}),
+      ...(status ? { status } : {}),
+      ...(keyword
+        ? {
+            OR: [
+              { username: { contains: keyword, mode: 'insensitive' } },
+              { displayName: { contains: keyword, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
 
-    sendSuccess(res, { users: users.map(toSafeUser) });
+    const [users, total] = await prisma.$transaction([
+      prisma.user.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    sendSuccess(res, {
+      items: users.map(toSafeUser),
+      page,
+      pageSize,
+      total,
+      totalPages: Math.ceil(total / pageSize),
+    });
   }),
 );
 
@@ -102,6 +137,19 @@ adminUsersRouter.patch(
       throw new AppError('NOT_FOUND', '用户不存在', 404);
     }
 
+    if (status === UserStatus.DISABLED && user.role === UserRole.ADMIN) {
+      if (user.id === req.currentUser!.id) {
+        throw new AppError('VALIDATION_ERROR', '不能禁用自己的管理员账号', 400);
+      }
+
+      const activeAdminCount = await prisma.user.count({
+        where: { role: UserRole.ADMIN, status: UserStatus.ACTIVE, deletedAt: null },
+      });
+      if (activeAdminCount <= 1) {
+        throw new AppError('VALIDATION_ERROR', '不能禁用最后一个可用管理员', 400);
+      }
+    }
+
     const updatedUser = await prisma.user.update({
       where: { id },
       data: {
@@ -130,7 +178,7 @@ adminUsersRouter.post(
   validate({ params: idParamsSchema, body: resetPasswordSchema }),
   asyncHandler(async (req, res) => {
     const { id } = req.params as z.infer<typeof idParamsSchema>;
-    const { password } = req.body as z.infer<typeof resetPasswordSchema>;
+    const { newPassword } = req.body as z.infer<typeof resetPasswordSchema>;
 
     const user = await prisma.user.findFirst({
       where: { id, deletedAt: null },
@@ -143,7 +191,7 @@ adminUsersRouter.post(
     const updatedUser = await prisma.user.update({
       where: { id },
       data: {
-        passwordHash: await hashPassword(password),
+        passwordHash: await hashPassword(newPassword),
         tokenVersion: { increment: 1 },
       },
     });

@@ -4,8 +4,9 @@
 
 ## Documents
 
-- 开发文档：`personal/docs/知识库开发文档.md`
-- 开发步骤：`personal/docs/开发步骤.md`
+- 计划书：`docs/计划书.txt`
+- 开发文档：`docs/知识库开发文档.md`
+- 开发步骤：`docs/开发步骤.md`
 
 ## Project Structure
 

@@ -36,6 +36,7 @@ const createCategory = async (name: string, parentId?: string | null) => {
     data: {
       name,
       parentId: parentId ?? null,
+      activeKey: `${parentId ?? '__ROOT__'}:${name.trim().toLowerCase()}`,
       sortOrder: 0,
     },
   });
@@ -147,6 +148,32 @@ describe('category routes', () => {
       .expect(400);
 
     expect(circularResponse.body.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('allows recreating a root category after soft deletion', async () => {
+    const admin = await createUser(UserRole.ADMIN);
+    const adminAuth = authHeaderFor(admin);
+    const name = `Reusable ${unique()}`;
+
+    const firstResponse = await request(app)
+      .post('/api/admin/categories')
+      .set('Authorization', adminAuth)
+      .send({ name })
+      .expect(201);
+    const firstCategory = firstResponse.body.data.category;
+    createdCategoryIds.push(firstCategory.id);
+
+    await request(app).delete(`/api/admin/categories/${firstCategory.id}`).set('Authorization', adminAuth).expect(200);
+
+    const secondResponse = await request(app)
+      .post('/api/admin/categories')
+      .set('Authorization', adminAuth)
+      .send({ name })
+      .expect(201);
+    const secondCategory = secondResponse.body.data.category;
+    createdCategoryIds.push(secondCategory.id);
+
+    expect(secondCategory.id).not.toBe(firstCategory.id);
   });
 
   it('rejects non-admin users from category management', async () => {

@@ -142,7 +142,7 @@ describe('admin user routes', () => {
       .set('Authorization', adminAuth)
       .expect(200);
 
-    expect(listResponse.body.data.users.some((user: { username: string }) => user.username === newUsername)).toBe(true);
+    expect(listResponse.body.data.items.some((user: { username: string }) => user.username === newUsername)).toBe(true);
 
     await request(app)
       .patch(`/api/admin/users/${createdUserId}/status`)
@@ -159,7 +159,7 @@ describe('admin user routes', () => {
     await request(app)
       .post(`/api/admin/users/${createdUserId}/reset-password`)
       .set('Authorization', adminAuth)
-      .send({ password: 'ResetPassword123!' })
+      .send({ newPassword: 'ResetPassword123!' })
       .expect(200);
 
     await request(app)
