@@ -5,7 +5,10 @@ import { useRoute, useRouter } from 'vue-router';
 
 import { knowledgeApi } from '@/api/knowledge';
 import { taxonomyApi } from '@/api/taxonomy';
+import AttachmentUploader from '@/components/AttachmentUploader.vue';
+import ImageUploader from '@/components/ImageUploader.vue';
 import TagSelect from '@/components/TagSelect.vue';
+import type { UploadedFile } from '@/types/files';
 import type { KnowledgePayload } from '@/types/knowledge';
 import type { CategoryNode, TagItem } from '@/types/taxonomy';
 
@@ -15,6 +18,7 @@ const message = useMessage();
 const loading = ref(false);
 const categories = ref<CategoryNode[]>([]);
 const tags = ref<TagItem[]>([]);
+const files = ref<UploadedFile[]>([]);
 
 const isEdit = computed(() => Boolean(route.params.id));
 const knowledgeId = computed(() => String(route.params.id ?? ''));
@@ -25,6 +29,7 @@ const form = reactive<KnowledgePayload>({
   status: 'DRAFT',
   categoryId: '',
   tagIds: [],
+  attachmentIds: [],
 });
 
 const flattenCategories = (nodes: CategoryNode[], depth = 0): SelectOption[] => {
@@ -51,6 +56,7 @@ const loadKnowledge = async () => {
   form.status = detail.status === 'ARCHIVED' ? 'PUBLISHED' : detail.status;
   form.categoryId = detail.category.id;
   form.tagIds = detail.tags.map((tag) => tag.id);
+  files.value = detail.attachments;
 };
 
 const init = async () => {
@@ -73,7 +79,7 @@ const submit = async (status: KnowledgePayload['status']) => {
 
   loading.value = true;
   try {
-    const payload = { ...form, status };
+    const payload: KnowledgePayload = { ...form, status, attachmentIds: files.value.map((file) => file.id) };
     const saved = isEdit.value ? await knowledgeApi.update(knowledgeId.value, payload) : await knowledgeApi.create(payload);
     message.success(status === 'PUBLISHED' ? '知识已发布' : '草稿已保存');
     await router.push({ name: 'knowledge-detail', params: { id: saved.id } });
@@ -111,8 +117,14 @@ onMounted(init);
           <NFormItem label="标签">
             <TagSelect v-model="form.tagIds" :tags="tags" />
           </NFormItem>
+          <NFormItem label="正文图片">
+            <ImageUploader v-model:files="files" v-model:markdown="form.content" />
+          </NFormItem>
           <NFormItem label="正文 Markdown">
             <NInput v-model:value="form.content" type="textarea" placeholder="# 标题\n正文内容" :autosize="{ minRows: 14 }" />
+          </NFormItem>
+          <NFormItem label="附件">
+            <AttachmentUploader v-model:files="files" />
           </NFormItem>
           <NSpace>
             <NButton @click="submit('DRAFT')">保存草稿</NButton>

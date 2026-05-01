@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { NButton, NCard, NDescriptions, NDescriptionsItem, NH1, NPopconfirm, NSpace, NSpin, NTag, NText, useMessage } from 'naive-ui';
+import { NButton, NCard, NDescriptions, NDescriptionsItem, NH1, NList, NListItem, NPopconfirm, NSpace, NSpin, NTag, NText, NThing, useMessage } from 'naive-ui';
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { knowledgeApi } from '@/api/knowledge';
 import { useAuthStore } from '@/stores/auth';
 import type { KnowledgeDetail } from '@/types/knowledge';
+import { downloadFile, previewFile } from '@/utils/file-actions';
 
 const route = useRoute();
 const router = useRouter();
@@ -19,6 +20,13 @@ const canManage = computed(() => {
   if (!knowledge.value || !authStore.currentUser) return false;
   return authStore.isAdmin || knowledge.value.author.id === authStore.currentUser.id;
 });
+const attachmentFiles = computed(() => knowledge.value?.attachments.filter((file) => file.usageType === 'ATTACHMENT') ?? []);
+
+const formatFileSize = (size: number) => {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / 1024 / 1024).toFixed(1)} MB`;
+};
 
 const loadDetail = async () => {
   loading.value = true;
@@ -76,6 +84,21 @@ onMounted(loadDetail);
           <NTag v-for="tag in knowledge.tags" :key="tag.id" size="small" type="info">{{ tag.name }}</NTag>
         </NSpace>
         <article class="markdown-preview">{{ knowledge.content }}</article>
+      </NCard>
+
+      <NCard v-if="attachmentFiles.length" title="附件下载">
+        <NList bordered>
+          <NListItem v-for="file in attachmentFiles" :key="file.id">
+            <NThing :title="file.originalName" :description="`${formatFileSize(file.fileSize)} · ${file.extension.toUpperCase()}`">
+              <template #header-extra>
+                <NSpace>
+                  <NButton v-if="file.extension === 'pdf'" text @click="previewFile(file)">预览</NButton>
+                  <NButton text @click="downloadFile(file)">下载</NButton>
+                </NSpace>
+              </template>
+            </NThing>
+          </NListItem>
+        </NList>
       </NCard>
     </main>
   </NSpin>

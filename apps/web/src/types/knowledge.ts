@@ -1,4 +1,5 @@
 import type { UserRole } from './auth';
+import type { UploadedFile } from './files';
 import type { TagItem } from './taxonomy';
 
 export type KnowledgeStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
@@ -36,13 +37,7 @@ export type KnowledgeSummary = {
 
 export type KnowledgeDetail = KnowledgeSummary & {
   content: string;
-  attachments: Array<{
-    id: string;
-    originalName: string;
-    fileSize: number;
-    mimeType: string;
-    usageType: string;
-  }>;
+  attachments: UploadedFile[];
   likedByMe: boolean;
   favoritedByMe: boolean;
 };
@@ -54,6 +49,7 @@ export type KnowledgePayload = {
   status: Extract<KnowledgeStatus, 'DRAFT' | 'PUBLISHED'>;
   categoryId: string;
   tagIds: string[];
+  attachmentIds: string[];
 };
 
 export type KnowledgeListParams = {

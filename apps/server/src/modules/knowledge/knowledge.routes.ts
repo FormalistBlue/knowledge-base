@@ -1,4 +1,4 @@
-import { AuditAction, KnowledgeStatus, NotificationType, Prisma, UserRole } from '@prisma/client';
+import { AttachmentStatus, AuditAction, KnowledgeStatus, NotificationType, Prisma, UserRole } from '@prisma/client';
 import { Router } from 'express';
 import { z } from 'zod';
 
@@ -16,6 +16,8 @@ export const adminKnowledgeRouter = Router();
 
 const tagIdsSchema = z.array(z.string().trim().min(1)).default([]);
 
+const attachmentIdsSchema = z.array(z.string().trim().min(1)).default([]);
+
 const knowledgeBodySchema = z.object({
   title: z.string().trim().min(1).max(120),
   summary: z.string().trim().min(1).max(500),
@@ -23,6 +25,7 @@ const knowledgeBodySchema = z.object({
   status: z.enum([KnowledgeStatus.DRAFT, KnowledgeStatus.PUBLISHED]),
   categoryId: z.string().trim().min(1),
   tagIds: tagIdsSchema,
+  attachmentIds: attachmentIdsSchema,
 });
 
 const listQuerySchema = z.object({
@@ -80,6 +83,26 @@ const ensureTagsExist = async (tagIds: string[]) => {
   return uniqueTagIds;
 };
 
+const ensureTempAttachmentsExist = async (attachmentIds: string[], uploaderId: string) => {
+  const uniqueAttachmentIds = [...new Set(attachmentIds)];
+  if (uniqueAttachmentIds.length === 0) {
+    return uniqueAttachmentIds;
+  }
+
+  const attachments = await prisma.attachment.findMany({
+    where: {
+      id: { in: uniqueAttachmentIds },
+      uploaderId,
+      deletedAt: null,
+    },
+    select: { id: true },
+  });
+  if (attachments.length !== uniqueAttachmentIds.length) {
+    throw new AppError('NOT_FOUND', '附件不存在或无权绑定', 404);
+  }
+  return uniqueAttachmentIds;
+};
+
 const canManageKnowledge = (knowledge: { authorId: string }, user: CurrentUser) => {
   return user.role === UserRole.ADMIN || knowledge.authorId === user.id;
 };
@@ -95,6 +118,33 @@ const getKnowledgeOrThrow = async (id: string) => {
 const assertCanManageKnowledge = (knowledge: { authorId: string }, user: CurrentUser) => {
   if (!canManageKnowledge(knowledge, user)) {
     throw new AppError('FORBIDDEN', '只能维护自己的知识内容', 403);
+  }
+};
+
+const bindAttachments = async ({
+  tx,
+  knowledgeId,
+  attachmentIds,
+  uploaderId,
+}: {
+  tx: Prisma.TransactionClient;
+  knowledgeId: string;
+  attachmentIds: string[];
+  uploaderId: string;
+}) => {
+  const uniqueAttachmentIds = await ensureTempAttachmentsExist(attachmentIds, uploaderId);
+  const now = new Date();
+
+  await tx.attachment.updateMany({
+    where: { knowledgeId, id: { notIn: uniqueAttachmentIds }, deletedAt: null },
+    data: { knowledgeId: null, status: AttachmentStatus.TEMP, boundAt: null },
+  });
+
+  if (uniqueAttachmentIds.length > 0) {
+    await tx.attachment.updateMany({
+      where: { id: { in: uniqueAttachmentIds }, uploaderId, deletedAt: null },
+      data: { knowledgeId, status: AttachmentStatus.BOUND, boundAt: now },
+    });
   }
 };
 
@@ -233,24 +283,27 @@ knowledgeRouter.post(
   validate({ body: knowledgeBodySchema }),
   asyncHandler(async (req, res) => {
     const currentUser = req.currentUser!;
-    const { title, summary, content, status, categoryId, tagIds } = req.body as z.infer<typeof knowledgeBodySchema>;
+    const { title, summary, content, status, categoryId, tagIds, attachmentIds } = req.body as z.infer<typeof knowledgeBodySchema>;
     await ensureCategoryExists(categoryId);
     const uniqueTagIds = await ensureTagsExist(tagIds);
     const timestamps = timestampsForStatus(status);
 
-    const knowledge = await prisma.knowledgeItem.create({
-      data: {
-        title,
-        summary,
-        content,
-        status,
-        categoryId,
-        authorId: currentUser.id,
-        publishedAt: timestamps.publishedAt,
-        archivedAt: timestamps.archivedAt,
-        tags: { create: uniqueTagIds.map((tagId) => ({ tagId })) },
-      },
-      include: relationInclude,
+    const knowledge = await prisma.$transaction(async (tx) => {
+      const createdKnowledge = await tx.knowledgeItem.create({
+        data: {
+          title,
+          summary,
+          content,
+          status,
+          categoryId,
+          authorId: currentUser.id,
+          publishedAt: timestamps.publishedAt,
+          archivedAt: timestamps.archivedAt,
+          tags: { create: uniqueTagIds.map((tagId) => ({ tagId })) },
+        },
+      });
+      await bindAttachments({ tx, knowledgeId: createdKnowledge.id, attachmentIds, uploaderId: currentUser.id });
+      return tx.knowledgeItem.findUniqueOrThrow({ where: { id: createdKnowledge.id }, include: relationInclude });
     });
 
     sendSuccess(res, { knowledge: toKnowledgeDetail(knowledge, currentUser.id) }, 'created', 201);
@@ -263,7 +316,7 @@ knowledgeRouter.put(
   asyncHandler(async (req, res) => {
     const { id } = req.params as z.infer<typeof idParamsSchema>;
     const currentUser = req.currentUser!;
-    const { title, summary, content, status, categoryId, tagIds } = req.body as z.infer<typeof knowledgeBodySchema>;
+    const { title, summary, content, status, categoryId, tagIds, attachmentIds } = req.body as z.infer<typeof knowledgeBodySchema>;
     const knowledge = await getKnowledgeOrThrow(id);
     assertCanManageKnowledge(knowledge, currentUser);
     await ensureCategoryExists(categoryId);
@@ -272,6 +325,7 @@ knowledgeRouter.put(
 
     const updatedKnowledge = await prisma.$transaction(async (tx) => {
       await tx.knowledgeTag.deleteMany({ where: { knowledgeId: id } });
+      await bindAttachments({ tx, knowledgeId: id, attachmentIds, uploaderId: currentUser.id });
       return tx.knowledgeItem.update({
         where: { id },
         data: {
