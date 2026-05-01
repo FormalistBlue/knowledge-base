@@ -9,7 +9,7 @@ import { validate } from './middlewares/validate.js';
 import { adminUsersRouter } from './modules/admin/users.routes.js';
 import { authRouter } from './modules/auth/auth.routes.js';
 import { filesRouter } from './modules/files/files.routes.js';
-import { adminKnowledgeRouter, knowledgeRouter } from './modules/knowledge/knowledge.routes.js';
+import { adminKnowledgeRouter, knowledgeRouter, meKnowledgeRouter } from './modules/knowledge/knowledge.routes.js';
 import { adminCategoriesRouter, categoriesRouter } from './modules/taxonomy/categories.routes.js';
 import { adminTagsRouter, tagsRouter } from './modules/taxonomy/tags.routes.js';
 import { AppError } from './utils/app-error.js';
@@ -49,6 +49,7 @@ export const createApp = () => {
   app.use('/api/categories', categoriesRouter);
   app.use('/api/tags', tagsRouter);
   app.use('/api/knowledge', knowledgeRouter);
+  app.use('/api/me', meKnowledgeRouter);
   app.use('/api/files', filesRouter);
   app.use('/api/admin/users', adminUsersRouter);
   app.use('/api/admin/knowledge', adminKnowledgeRouter);

@@ -12,6 +12,7 @@ import type { CurrentUser } from '../../types/express.js';
 import { toKnowledgeDetail, toKnowledgeSummary } from './knowledge-presenter.js';
 
 export const knowledgeRouter = Router();
+export const meKnowledgeRouter = Router();
 export const adminKnowledgeRouter = Router();
 
 const tagIdsSchema = z.array(z.string().trim().min(1)).default([]);
@@ -58,6 +59,10 @@ const statusBodySchema = z.object({ status: z.nativeEnum(KnowledgeStatus) });
 const pinBodySchema = z.object({ isPinned: z.boolean() });
 const categoryBodySchema = z.object({ categoryId: z.string().trim().min(1) });
 const tagsBodySchema = z.object({ tagIds: tagIdsSchema });
+const favoriteListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
 
 const relationInclude = {
   category: true,
@@ -161,6 +166,39 @@ const getKnowledgeOrThrow = async (id: string) => {
   return knowledge;
 };
 
+const getVisibleKnowledgeOrThrow = async (id: string, user: CurrentUser) => {
+  const knowledge = await prisma.knowledgeItem.findFirst({ where: { id, deletedAt: null }, include: relationInclude });
+  if (!knowledge || (knowledge.status !== KnowledgeStatus.PUBLISHED && !canManageKnowledge(knowledge, user))) {
+    throw new AppError('NOT_FOUND', '知识不存在', 404);
+  }
+  return knowledge;
+};
+
+const todayStart = () => {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+const recordKnowledgeView = async (knowledgeId: string, userId: string) => {
+  const created = await prisma.knowledgeView.createMany({
+    data: { knowledgeId, userId, viewDate: todayStart() },
+    skipDuplicates: true,
+  });
+
+  if (created.count > 0) {
+    await prisma.knowledgeItem.update({ where: { id: knowledgeId }, data: { viewCount: { increment: 1 } } });
+  }
+};
+
+const getKnowledgeDetailForUser = async (id: string, user: CurrentUser) => {
+  const knowledge = await getVisibleKnowledgeOrThrow(id, user);
+  if (knowledge.status === KnowledgeStatus.PUBLISHED) {
+    await recordKnowledgeView(id, user.id);
+  }
+  return prisma.knowledgeItem.findFirstOrThrow({ where: { id, deletedAt: null }, include: relationInclude });
+};
+
 const assertCanManageKnowledge = (knowledge: { authorId: string }, user: CurrentUser) => {
   if (!canManageKnowledge(knowledge, user)) {
     throw new AppError('FORBIDDEN', '只能维护自己的知识内容', 403);
@@ -249,6 +287,39 @@ const writeAuditLog = async ({
     },
   });
 };
+
+meKnowledgeRouter.use(requireAuth);
+meKnowledgeRouter.get(
+  '/favorites',
+  validate({ query: favoriteListQuerySchema }),
+  asyncHandler(async (req, res) => {
+    const currentUser = req.currentUser!;
+    const { page, pageSize } = req.query as unknown as z.infer<typeof favoriteListQuerySchema>;
+    const where: Prisma.KnowledgeFavoriteWhereInput = {
+      userId: currentUser.id,
+      knowledge: publishedWhere,
+    };
+
+    const [favorites, total] = await prisma.$transaction([
+      prisma.knowledgeFavorite.findMany({
+        where,
+        include: { knowledge: { include: relationInclude } },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.knowledgeFavorite.count({ where }),
+    ]);
+
+    sendSuccess(res, {
+      items: favorites.map((favorite) => toKnowledgeSummary(favorite.knowledge)),
+      page,
+      pageSize,
+      total,
+      totalPages: Math.ceil(total / pageSize),
+    });
+  }),
+);
 
 knowledgeRouter.use(requireAuth);
 knowledgeRouter.get(
@@ -357,16 +428,59 @@ knowledgeRouter.get(
   asyncHandler(async (req, res) => {
     const { id } = req.params as z.infer<typeof idParamsSchema>;
     const currentUser = req.currentUser!;
-    const knowledge = await prisma.knowledgeItem.findFirst({ where: { id, deletedAt: null }, include: relationInclude });
+    const knowledge = await getKnowledgeDetailForUser(id, currentUser);
+    sendSuccess(res, { knowledge: toKnowledgeDetail(knowledge, currentUser.id) });
+  }),
+);
 
-    if (!knowledge) {
-      throw new AppError('NOT_FOUND', '知识不存在', 404);
-    }
+knowledgeRouter.post(
+  '/:id/like',
+  validate({ params: idParamsSchema }),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params as z.infer<typeof idParamsSchema>;
+    const currentUser = req.currentUser!;
+    await getVisibleKnowledgeOrThrow(id, currentUser);
+    await prisma.knowledgeLike.createMany({ data: { knowledgeId: id, userId: currentUser.id }, skipDuplicates: true });
+    const knowledge = await prisma.knowledgeItem.findFirstOrThrow({ where: { id, deletedAt: null }, include: relationInclude });
+    sendSuccess(res, { knowledge: toKnowledgeDetail(knowledge, currentUser.id) });
+  }),
+);
 
-    if (knowledge.status !== KnowledgeStatus.PUBLISHED && !canManageKnowledge(knowledge, currentUser)) {
-      throw new AppError('NOT_FOUND', '知识不存在', 404);
-    }
+knowledgeRouter.delete(
+  '/:id/like',
+  validate({ params: idParamsSchema }),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params as z.infer<typeof idParamsSchema>;
+    const currentUser = req.currentUser!;
+    await getVisibleKnowledgeOrThrow(id, currentUser);
+    await prisma.knowledgeLike.deleteMany({ where: { knowledgeId: id, userId: currentUser.id } });
+    const knowledge = await prisma.knowledgeItem.findFirstOrThrow({ where: { id, deletedAt: null }, include: relationInclude });
+    sendSuccess(res, { knowledge: toKnowledgeDetail(knowledge, currentUser.id) });
+  }),
+);
 
+knowledgeRouter.post(
+  '/:id/favorite',
+  validate({ params: idParamsSchema }),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params as z.infer<typeof idParamsSchema>;
+    const currentUser = req.currentUser!;
+    await getVisibleKnowledgeOrThrow(id, currentUser);
+    await prisma.knowledgeFavorite.createMany({ data: { knowledgeId: id, userId: currentUser.id }, skipDuplicates: true });
+    const knowledge = await prisma.knowledgeItem.findFirstOrThrow({ where: { id, deletedAt: null }, include: relationInclude });
+    sendSuccess(res, { knowledge: toKnowledgeDetail(knowledge, currentUser.id) });
+  }),
+);
+
+knowledgeRouter.delete(
+  '/:id/favorite',
+  validate({ params: idParamsSchema }),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params as z.infer<typeof idParamsSchema>;
+    const currentUser = req.currentUser!;
+    await getVisibleKnowledgeOrThrow(id, currentUser);
+    await prisma.knowledgeFavorite.deleteMany({ where: { knowledgeId: id, userId: currentUser.id } });
+    const knowledge = await prisma.knowledgeItem.findFirstOrThrow({ where: { id, deletedAt: null }, include: relationInclude });
     sendSuccess(res, { knowledge: toKnowledgeDetail(knowledge, currentUser.id) });
   }),
 );

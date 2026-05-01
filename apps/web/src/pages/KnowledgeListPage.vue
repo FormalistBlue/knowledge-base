@@ -212,7 +212,7 @@ watch(
                   <NTag v-for="tag in item.tags" :key="tag.id" size="small" type="info">{{ tag.name }}</NTag>
                 </NSpace>
                 <NText depth="3">
-                  {{ item.author.displayName }} · 浏览 {{ item.viewCount }} · 发布
+                  {{ item.author.displayName }} · 浏览 {{ item.viewCount }} · 点赞 {{ item.likeCount }} · 收藏 {{ item.favoriteCount }} · 发布
                   {{ item.publishedAt ? new Date(item.publishedAt).toLocaleDateString() : '-' }} · 更新
                   {{ new Date(item.updatedAt).toLocaleString() }}
                 </NText>

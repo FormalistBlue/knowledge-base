@@ -40,12 +40,13 @@ onMounted(loadHome);
 <template>
   <main class="home-page page-stack">
     <section class="hero">
-      <NTag type="success" round>阶段 9 搜索、筛选和首页</NTag>
+      <NTag type="success" round>阶段 10 点赞、收藏、浏览数</NTag>
       <NH1>欢迎回来，{{ authStore.currentUser?.displayName }}</NH1>
-      <NP>从置顶、最新、热门、分类和标签入口快速进入部门知识内容。</NP>
+      <NP>从置顶、最新、热门、分类、标签和个人收藏入口快速进入部门知识内容。</NP>
       <NSpace>
         <NButton type="primary" @click="router.push({ name: 'knowledge-create' })">创建知识</NButton>
         <NButton @click="router.push({ name: 'knowledge-list' })">高级搜索</NButton>
+        <NButton secondary @click="router.push({ name: 'my-favorites' })">我的收藏</NButton>
         <NButton v-if="authStore.isAdmin" secondary @click="router.push({ name: 'admin-users' })">进入后台</NButton>
       </NSpace>
     </section>
@@ -87,7 +88,7 @@ onMounted(loadHome);
                   <NTag size="small" type="warning">置顶</NTag>
                 </NSpace>
                 <NText depth="3">{{ item.summary }}</NText>
-                <NText depth="3">{{ item.category.name }} · 浏览 {{ item.viewCount }}</NText>
+                <NText depth="3">{{ item.category.name }} · 浏览 {{ item.viewCount }} · 点赞 {{ item.likeCount }} · 收藏 {{ item.favoriteCount }}</NText>
               </NSpace>
             </NCard>
           </div>
@@ -107,7 +108,9 @@ onMounted(loadHome);
                 <NCard v-for="item in homeData.latest" :key="item.id" size="small" class="knowledge-mini-card" @click="openKnowledge(item)">
                   <NSpace vertical size="small">
                     <NText strong>{{ item.title }}</NText>
-                    <NText depth="3">{{ item.publishedAt ? new Date(item.publishedAt).toLocaleDateString() : '-' }} · {{ item.category.name }}</NText>
+                    <NText depth="3">
+                      {{ item.publishedAt ? new Date(item.publishedAt).toLocaleDateString() : '-' }} · {{ item.category.name }} · 点赞 {{ item.likeCount }}
+                    </NText>
                   </NSpace>
                 </NCard>
               </NSpace>
@@ -126,7 +129,7 @@ onMounted(loadHome);
                 <NCard v-for="item in homeData.popular" :key="item.id" size="small" class="knowledge-mini-card" @click="openKnowledge(item)">
                   <NSpace vertical size="small">
                     <NText strong>{{ item.title }}</NText>
-                    <NText depth="3">浏览 {{ item.viewCount }} · {{ item.category.name }}</NText>
+                    <NText depth="3">浏览 {{ item.viewCount }} · 点赞 {{ item.likeCount }} · 收藏 {{ item.favoriteCount }} · {{ item.category.name }}</NText>
                   </NSpace>
                 </NCard>
               </NSpace>

@@ -1,5 +1,20 @@
 <script setup lang="ts">
-import { NButton, NCard, NDescriptions, NDescriptionsItem, NH1, NList, NListItem, NPopconfirm, NSpace, NSpin, NTag, NText, NThing, useMessage } from 'naive-ui';
+import {
+  NButton,
+  NCard,
+  NDescriptions,
+  NDescriptionsItem,
+  NH1,
+  NList,
+  NListItem,
+  NPopconfirm,
+  NSpace,
+  NSpin,
+  NTag,
+  NText,
+  NThing,
+  useMessage,
+} from 'naive-ui';
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
@@ -50,6 +65,17 @@ const handleArchive = async () => {
   message.success('已归档知识');
 };
 
+const toggleLike = async () => {
+  if (!knowledge.value) return;
+  knowledge.value = knowledge.value.likedByMe ? await knowledgeApi.unlike(knowledge.value.id) : await knowledgeApi.like(knowledge.value.id);
+};
+
+const toggleFavorite = async () => {
+  if (!knowledge.value) return;
+  knowledge.value = knowledge.value.favoritedByMe ? await knowledgeApi.unfavorite(knowledge.value.id) : await knowledgeApi.favorite(knowledge.value.id);
+  message.success(knowledge.value.favoritedByMe ? '已收藏' : '已取消收藏');
+};
+
 onMounted(loadDetail);
 </script>
 
@@ -62,15 +88,23 @@ onMounted(loadDetail);
           <NH1>{{ knowledge.title }}</NH1>
           <NText depth="3">{{ knowledge.summary }}</NText>
         </div>
-        <NSpace v-if="canManage">
-          <NButton @click="router.push({ name: 'knowledge-edit', params: { id: knowledge.id } })">编辑</NButton>
-          <NButton secondary @click="handleArchive">归档</NButton>
-          <NPopconfirm @positive-click="handleDelete">
-            <template #trigger>
-              <NButton type="error" secondary>删除</NButton>
-            </template>
-            确认删除这篇知识吗？
-          </NPopconfirm>
+        <NSpace>
+          <NButton :type="knowledge.likedByMe ? 'primary' : 'default'" secondary @click="toggleLike">
+            {{ knowledge.likedByMe ? '已点赞' : '点赞' }} {{ knowledge.likeCount }}
+          </NButton>
+          <NButton :type="knowledge.favoritedByMe ? 'warning' : 'default'" secondary @click="toggleFavorite">
+            {{ knowledge.favoritedByMe ? '已收藏' : '收藏' }} {{ knowledge.favoriteCount }}
+          </NButton>
+          <template v-if="canManage">
+            <NButton @click="router.push({ name: 'knowledge-edit', params: { id: knowledge.id } })">编辑</NButton>
+            <NButton secondary @click="handleArchive">归档</NButton>
+            <NPopconfirm @positive-click="handleDelete">
+              <template #trigger>
+                <NButton type="error" secondary>删除</NButton>
+              </template>
+              确认删除这篇知识吗？
+            </NPopconfirm>
+          </template>
         </NSpace>
       </section>
 
@@ -79,6 +113,8 @@ onMounted(loadDetail);
           <NDescriptionsItem label="作者">{{ knowledge.author.displayName }}</NDescriptionsItem>
           <NDescriptionsItem label="分类">{{ knowledge.category.name }}</NDescriptionsItem>
           <NDescriptionsItem label="浏览">{{ knowledge.viewCount }}</NDescriptionsItem>
+          <NDescriptionsItem label="点赞">{{ knowledge.likeCount }}</NDescriptionsItem>
+          <NDescriptionsItem label="收藏">{{ knowledge.favoriteCount }}</NDescriptionsItem>
         </NDescriptions>
         <NSpace class="knowledge-tags" size="small">
           <NTag v-for="tag in knowledge.tags" :key="tag.id" size="small" type="info">{{ tag.name }}</NTag>

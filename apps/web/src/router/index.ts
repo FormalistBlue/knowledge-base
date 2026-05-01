@@ -9,6 +9,7 @@ import KnowledgeDetailPage from '@/pages/KnowledgeDetailPage.vue';
 import KnowledgeEditorPage from '@/pages/KnowledgeEditorPage.vue';
 import KnowledgeListPage from '@/pages/KnowledgeListPage.vue';
 import LoginPage from '@/pages/LoginPage.vue';
+import MyFavoritesPage from '@/pages/MyFavoritesPage.vue';
 import UnauthorizedPage from '@/pages/UnauthorizedPage.vue';
 import { useAuthStore } from '@/stores/auth';
 
@@ -42,6 +43,12 @@ const router = createRouter({
           path: 'knowledge/create',
           name: 'knowledge-create',
           component: KnowledgeEditorPage,
+          meta: { requiresAuth: true },
+        },
+        {
+          path: 'me/favorites',
+          name: 'my-favorites',
+          component: MyFavoritesPage,
           meta: { requiresAuth: true },
         },
         {

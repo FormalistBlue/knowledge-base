@@ -1,6 +1,7 @@
 import { http, type ApiResponse } from './http';
 import type {
   KnowledgeDetail,
+  KnowledgeFavoritesParams,
   KnowledgeHomeResult,
   KnowledgeListParams,
   KnowledgeListResult,
@@ -49,6 +50,31 @@ export const knowledgeApi = {
 
   async delete(id: string): Promise<void> {
     await http.delete<unknown, ApiResponse<{ id: string }>>(`/knowledge/${id}`);
+  },
+
+  async like(id: string): Promise<KnowledgeDetail> {
+    const response = await http.post<unknown, ApiResponse<{ knowledge: KnowledgeDetail }>>(`/knowledge/${id}/like`);
+    return response.data.knowledge;
+  },
+
+  async unlike(id: string): Promise<KnowledgeDetail> {
+    const response = await http.delete<unknown, ApiResponse<{ knowledge: KnowledgeDetail }>>(`/knowledge/${id}/like`);
+    return response.data.knowledge;
+  },
+
+  async favorite(id: string): Promise<KnowledgeDetail> {
+    const response = await http.post<unknown, ApiResponse<{ knowledge: KnowledgeDetail }>>(`/knowledge/${id}/favorite`);
+    return response.data.knowledge;
+  },
+
+  async unfavorite(id: string): Promise<KnowledgeDetail> {
+    const response = await http.delete<unknown, ApiResponse<{ knowledge: KnowledgeDetail }>>(`/knowledge/${id}/favorite`);
+    return response.data.knowledge;
+  },
+
+  async favorites(params: KnowledgeFavoritesParams = {}): Promise<KnowledgeListResult> {
+    const response = await http.get<unknown, ApiResponse<KnowledgeListResult>>('/me/favorites', { params });
+    return response.data;
   },
 
   async pin(id: string, isPinned: boolean): Promise<KnowledgeSummary> {

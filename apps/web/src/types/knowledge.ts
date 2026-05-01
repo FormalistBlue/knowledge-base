@@ -67,6 +67,11 @@ export type KnowledgeListParams = {
   onlyMine?: boolean;
 };
 
+export type KnowledgeFavoritesParams = {
+  page?: number;
+  pageSize?: number;
+};
+
 export type KnowledgeListResult = {
   items: KnowledgeSummary[];
   page: number;

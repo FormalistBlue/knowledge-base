@@ -113,9 +113,21 @@ afterEach(async () => {
     },
   });
   await prisma.notification.deleteMany({ where: { relatedId: { in: createdKnowledgeIds } } });
-  await prisma.knowledgeView.deleteMany({ where: { knowledgeId: { in: createdKnowledgeIds } } });
-  await prisma.knowledgeFavorite.deleteMany({ where: { knowledgeId: { in: createdKnowledgeIds } } });
-  await prisma.knowledgeLike.deleteMany({ where: { knowledgeId: { in: createdKnowledgeIds } } });
+  await prisma.knowledgeView.deleteMany({
+    where: {
+      OR: [{ knowledgeId: { in: createdKnowledgeIds } }, { userId: { in: createdUserIds } }],
+    },
+  });
+  await prisma.knowledgeFavorite.deleteMany({
+    where: {
+      OR: [{ knowledgeId: { in: createdKnowledgeIds } }, { userId: { in: createdUserIds } }],
+    },
+  });
+  await prisma.knowledgeLike.deleteMany({
+    where: {
+      OR: [{ knowledgeId: { in: createdKnowledgeIds } }, { userId: { in: createdUserIds } }],
+    },
+  });
   await prisma.knowledgeTag.deleteMany({
     where: {
       OR: [{ knowledgeId: { in: createdKnowledgeIds } }, { tagId: { in: createdTagIds } }],
@@ -240,6 +252,54 @@ describe('knowledge search and home routes', () => {
     expect(userListResponse.body.data.items.some((item: { id: string }) => item.id === archivedKnowledge.id)).toBe(false);
 
     await request(app).get(`/api/knowledge/${archivedKnowledge.id}`).set('Authorization', authHeaderFor(admin)).expect(200);
+  });
+});
+
+describe('knowledge interaction routes', () => {
+  it('likes and favorites knowledge idempotently and returns my favorites', async () => {
+    const author = await createUser(UserRole.USER);
+    const reader = await createUser(UserRole.USER);
+    const category = await createCategory('Interaction Category');
+    const knowledge = await createKnowledge({ authorId: author.id, categoryId: category.id, title: 'Interaction Knowledge' });
+    const auth = authHeaderFor(reader);
+
+    const likeResponse = await request(app).post(`/api/knowledge/${knowledge.id}/like`).set('Authorization', auth).expect(200);
+    expect(likeResponse.body.data.knowledge).toMatchObject({ id: knowledge.id, likeCount: 1, likedByMe: true });
+
+    const duplicateLikeResponse = await request(app).post(`/api/knowledge/${knowledge.id}/like`).set('Authorization', auth).expect(200);
+    expect(duplicateLikeResponse.body.data.knowledge).toMatchObject({ likeCount: 1, likedByMe: true });
+
+    const favoriteResponse = await request(app).post(`/api/knowledge/${knowledge.id}/favorite`).set('Authorization', auth).expect(200);
+    expect(favoriteResponse.body.data.knowledge).toMatchObject({ id: knowledge.id, favoriteCount: 1, favoritedByMe: true });
+
+    const duplicateFavoriteResponse = await request(app).post(`/api/knowledge/${knowledge.id}/favorite`).set('Authorization', auth).expect(200);
+    expect(duplicateFavoriteResponse.body.data.knowledge).toMatchObject({ favoriteCount: 1, favoritedByMe: true });
+
+    const favoritesResponse = await request(app).get('/api/me/favorites').set('Authorization', auth).expect(200);
+    expect(favoritesResponse.body.data.items.map((item: { id: string }) => item.id)).toContain(knowledge.id);
+
+    const unlikeResponse = await request(app).delete(`/api/knowledge/${knowledge.id}/like`).set('Authorization', auth).expect(200);
+    expect(unlikeResponse.body.data.knowledge).toMatchObject({ likeCount: 0, likedByMe: false });
+
+    const unfavoriteResponse = await request(app).delete(`/api/knowledge/${knowledge.id}/favorite`).set('Authorization', auth).expect(200);
+    expect(unfavoriteResponse.body.data.knowledge).toMatchObject({ favoriteCount: 0, favoritedByMe: false });
+  });
+
+  it('counts one view per user per day when reading published knowledge', async () => {
+    const author = await createUser(UserRole.USER);
+    const reader = await createUser(UserRole.USER);
+    const category = await createCategory('View Category');
+    const knowledge = await createKnowledge({ authorId: author.id, categoryId: category.id, title: 'Viewed Knowledge', viewCount: 0 });
+    const auth = authHeaderFor(reader);
+
+    const firstResponse = await request(app).get(`/api/knowledge/${knowledge.id}`).set('Authorization', auth).expect(200);
+    expect(firstResponse.body.data.knowledge.viewCount).toBe(1);
+
+    const secondResponse = await request(app).get(`/api/knowledge/${knowledge.id}`).set('Authorization', auth).expect(200);
+    expect(secondResponse.body.data.knowledge.viewCount).toBe(1);
+
+    const viewRows = await prisma.knowledgeView.findMany({ where: { knowledgeId: knowledge.id, userId: reader.id } });
+    expect(viewRows).toHaveLength(1);
   });
 });
 
