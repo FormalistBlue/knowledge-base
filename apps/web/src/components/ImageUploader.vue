@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NButton, NImage, NInput, NSpace, NText, NUpload, useMessage, type UploadCustomRequestOptions } from 'naive-ui';
+import { NButton, NImage, NInput, NPopconfirm, NProgress, NSpace, NText, NUpload, useMessage, type UploadCustomRequestOptions } from 'naive-ui';
 import { computed, onBeforeUnmount, ref } from 'vue';
 
 import { filesApi } from '@/api/files';
@@ -18,6 +18,7 @@ const emit = defineEmits<{
 
 const message = useMessage();
 const uploading = ref(false);
+const uploadPercent = ref(0);
 const previewUrls = ref<Record<string, string>>({});
 
 const imageFiles = computed(() => props.files.filter((file) => file.usageType === 'IMAGE'));
@@ -48,9 +49,12 @@ const handleUpload = async ({ file, onFinish, onError }: UploadCustomRequestOpti
   }
 
   uploading.value = true;
+  uploadPercent.value = 30;
   try {
     const uploaded = await filesApi.uploadImage(rawFile);
+    uploadPercent.value = 80;
     await getPreviewUrl(uploaded);
+    uploadPercent.value = 100;
     emit('update:files', [...props.files, uploaded]);
     appendMarkdownImage(uploaded);
     message.success(`图片已上传：${uploaded.originalName}`);
@@ -60,6 +64,9 @@ const handleUpload = async ({ file, onFinish, onError }: UploadCustomRequestOpti
     onError();
   } finally {
     uploading.value = false;
+    window.setTimeout(() => {
+      uploadPercent.value = 0;
+    }, 500);
   }
 };
 
@@ -84,12 +91,18 @@ onBeforeUnmount(() => {
       </NUpload>
       <NText depth="3">支持 JPG、PNG、GIF、WebP。上传后会自动插入 Markdown 图片语法。</NText>
     </NSpace>
+    <NProgress v-if="uploading || uploadPercent" type="line" :percentage="uploadPercent" processing />
 
     <div v-if="imageFiles.length" class="image-grid">
       <div v-for="file in imageFiles" :key="file.id" class="image-card">
         <NImage :src="previewUrls[file.id]" :alt="file.originalName" object-fit="cover" width="120" height="90" @vue:mounted="ensurePreviewUrl(file)" />
         <NInput :value="`![${file.originalName}](${file.url})`" readonly size="small" />
-        <NButton text type="error" @click="removeImage(file.id)">移除</NButton>
+        <NPopconfirm @positive-click="removeImage(file.id)">
+          <template #trigger>
+            <NButton text type="error">移除</NButton>
+          </template>
+          确认从本文中移除此图片？
+        </NPopconfirm>
       </div>
     </div>
   </NSpace>

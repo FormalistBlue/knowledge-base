@@ -2,7 +2,9 @@ import { createRouter, createWebHistory } from 'vue-router';
 
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import MainLayout from '@/layouts/MainLayout.vue';
+import AdminAuditLogsPage from '@/pages/AdminAuditLogsPage.vue';
 import AdminCommentsPage from '@/pages/AdminCommentsPage.vue';
+import AdminDashboardPage from '@/pages/AdminDashboardPage.vue';
 import AdminKnowledgePage from '@/pages/AdminKnowledgePage.vue';
 import AdminTaxonomyPage from '@/pages/AdminTaxonomyPage.vue';
 import AdminUsersPage from '@/pages/AdminUsersPage.vue';
@@ -80,7 +82,9 @@ const router = createRouter({
       children: [
         {
           path: '',
-          redirect: { name: 'admin-users' },
+          name: 'admin-dashboard',
+          component: AdminDashboardPage,
+          meta: { requiresAuth: true, requiresAdmin: true },
         },
         {
           path: 'users',
@@ -104,6 +108,12 @@ const router = createRouter({
           path: 'comments',
           name: 'admin-comments',
           component: AdminCommentsPage,
+          meta: { requiresAuth: true, requiresAdmin: true },
+        },
+        {
+          path: 'audit-logs',
+          name: 'admin-audit-logs',
+          component: AdminAuditLogsPage,
           meta: { requiresAuth: true, requiresAdmin: true },
         },
       ],

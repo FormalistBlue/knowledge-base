@@ -24,9 +24,13 @@ const message = useMessage();
 const authStore = useAuthStore();
 const themeStore = useThemeStore();
 
-const activeMenuKey = computed(() => String(route.name ?? 'admin-users'));
+const activeMenuKey = computed(() => String(route.name ?? 'admin-dashboard'));
 
 const menuOptions = [
+  {
+    label: '后台概览',
+    key: 'admin-dashboard',
+  },
   {
     label: '用户管理',
     key: 'admin-users',
@@ -42,6 +46,10 @@ const menuOptions = [
   {
     label: '评论管理',
     key: 'admin-comments',
+  },
+  {
+    label: '审计日志',
+    key: 'admin-audit-logs',
   },
 ];
 

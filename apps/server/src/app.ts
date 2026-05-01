@@ -7,6 +7,7 @@ import { errorHandler } from './middlewares/error-handler.js';
 import { requestLogger } from './middlewares/request-logger.js';
 import { validate } from './middlewares/validate.js';
 import { adminCommentsRouter } from './modules/admin/comments.routes.js';
+import { adminAuditLogsRouter, adminStatsRouter } from './modules/admin/stats.routes.js';
 import { adminUsersRouter } from './modules/admin/users.routes.js';
 import { authRouter } from './modules/auth/auth.routes.js';
 import { filesRouter } from './modules/files/files.routes.js';
@@ -55,6 +56,8 @@ export const createApp = () => {
   app.use('/api/notifications', notificationsRouter);
   app.use('/api/files', filesRouter);
   app.use('/api/admin/users', adminUsersRouter);
+  app.use('/api/admin/stats', adminStatsRouter);
+  app.use('/api/admin/audit-logs', adminAuditLogsRouter);
   app.use('/api/admin/comments', adminCommentsRouter);
   app.use('/api/admin/knowledge', adminKnowledgeRouter);
   app.use('/api/admin/categories', adminCategoriesRouter);

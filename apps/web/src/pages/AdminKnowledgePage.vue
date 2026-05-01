@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NButton, NCard, NDataTable, NInput, NPagination, NSelect, NSpace, NTag, useMessage, type DataTableColumns, type SelectOption } from 'naive-ui';
+import { NButton, NCard, NDataTable, NInput, NPagination, NPopconfirm, NSelect, NSpace, NTag, useMessage, type DataTableColumns, type SelectOption } from 'naive-ui';
 import { h, onMounted, reactive, ref } from 'vue';
 
 import { knowledgeApi } from '@/api/knowledge';
@@ -121,7 +121,14 @@ const columns: DataTableColumns<KnowledgeSummary> = [
     render(row) {
       return h(NSpace, () => [
         h(NButton, { size: 'small', secondary: true, onClick: () => togglePin(row) }, { default: () => (row.isPinned ? '取消置顶' : '置顶') }),
-        h(NButton, { size: 'small', type: 'error', secondary: true, onClick: () => deleteKnowledge(row) }, { default: () => '删除' }),
+        h(
+          NPopconfirm,
+          { onPositiveClick: () => deleteKnowledge(row) },
+          {
+            trigger: () => h(NButton, { size: 'small', type: 'error', secondary: true }, { default: () => '删除' }),
+            default: () => `确认删除文章「${row.title}」？`,
+          },
+        ),
       ]);
     },
   },
