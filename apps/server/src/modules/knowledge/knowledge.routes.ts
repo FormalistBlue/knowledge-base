@@ -13,6 +13,8 @@ import { toKnowledgeDetail, toKnowledgeSummary } from './knowledge-presenter.js'
 
 export const knowledgeRouter = Router();
 export const meKnowledgeRouter = Router();
+export const commentsRouter = Router();
+export const notificationsRouter = Router();
 export const adminKnowledgeRouter = Router();
 
 const tagIdsSchema = z.array(z.string().trim().min(1)).default([]);
@@ -46,7 +48,7 @@ const listQuerySchema = z.object({
   status: z.nativeEnum(KnowledgeStatus).optional(),
   publishedFrom: z.coerce.date().optional(),
   publishedTo: z.coerce.date().optional(),
-  sortBy: z.enum(['publishedAt', 'viewCount', 'updatedAt']).default('publishedAt'),
+  sortBy: z.enum(['publishedAt', 'viewCount', 'updatedAt', 'createdAt']).default('publishedAt'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
   onlyMine: z
     .enum(['true', 'false'])
@@ -55,6 +57,18 @@ const listQuerySchema = z.object({
 });
 
 const idParamsSchema = z.object({ id: z.string().trim().min(1) });
+const commentBodySchema = z.object({
+  content: z.string().trim().min(1).max(2000),
+  parentId: z.string().trim().min(1).optional(),
+});
+const notificationListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  unreadOnly: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((value) => value === 'true'),
+});
 const statusBodySchema = z.object({ status: z.nativeEnum(KnowledgeStatus) });
 const pinBodySchema = z.object({ isPinned: z.boolean() });
 const categoryBodySchema = z.object({ categoryId: z.string().trim().min(1) });
@@ -269,21 +283,82 @@ const writeAuditLog = async ({
   targetId,
   summary,
   metadata,
+  targetType = 'KnowledgeItem',
 }: {
   actorId: string;
   action: AuditAction;
   targetId: string;
   summary: string;
   metadata?: Prisma.InputJsonValue;
+  targetType?: string;
 }) => {
   await prisma.auditLog.create({
     data: {
       actorId,
       action,
-      targetType: 'KnowledgeItem',
+      targetType,
       targetId,
       summary,
       metadata,
+    },
+  });
+};
+
+const toCommentItem = (
+  comment: Prisma.CommentGetPayload<{ include: { user: { select: { id: true; username: true; displayName: true } }; replies: { include: { user: { select: { id: true; username: true; displayName: true } } } } } }>,
+) => ({
+  id: comment.id,
+  knowledgeId: comment.knowledgeId,
+  parentId: comment.parentId,
+  content: comment.content,
+  user: comment.user,
+  createdAt: comment.createdAt,
+  updatedAt: comment.updatedAt,
+  replies: comment.replies.map((reply) => ({
+    id: reply.id,
+    knowledgeId: reply.knowledgeId,
+    parentId: reply.parentId,
+    content: reply.content,
+    user: reply.user,
+    createdAt: reply.createdAt,
+    updatedAt: reply.updatedAt,
+    replies: [],
+  })),
+});
+
+const toNotificationItem = (notification: Prisma.NotificationGetPayload<{}>) => ({
+  id: notification.id,
+  type: notification.type,
+  title: notification.title,
+  content: notification.content,
+  relatedType: notification.relatedType,
+  relatedId: notification.relatedId,
+  isRead: notification.isRead,
+  createdAt: notification.createdAt,
+  readAt: notification.readAt,
+});
+
+const createNotification = async ({
+  userId,
+  type,
+  title,
+  content,
+  relatedId,
+}: {
+  userId: string;
+  type: NotificationType;
+  title: string;
+  content: string;
+  relatedId: string;
+}) => {
+  await prisma.notification.create({
+    data: {
+      userId,
+      type,
+      title,
+      content,
+      relatedType: 'KnowledgeItem',
+      relatedId,
     },
   });
 };
@@ -419,6 +494,77 @@ knowledgeRouter.get(
         }))
         .sort((first, second) => second.knowledgeCount - first.knowledgeCount),
     });
+  }),
+);
+
+knowledgeRouter.get(
+  '/:id/comments',
+  validate({ params: idParamsSchema }),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params as z.infer<typeof idParamsSchema>;
+    await getVisibleKnowledgeOrThrow(id, req.currentUser!);
+    const comments = await prisma.comment.findMany({
+      where: { knowledgeId: id, parentId: null, deletedAt: null },
+      include: {
+        user: { select: { id: true, username: true, displayName: true } },
+        replies: {
+          where: { deletedAt: null },
+          include: { user: { select: { id: true, username: true, displayName: true } } },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+    sendSuccess(res, { items: comments.map(toCommentItem) });
+  }),
+);
+
+knowledgeRouter.post(
+  '/:id/comments',
+  validate({ params: idParamsSchema, body: commentBodySchema }),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params as z.infer<typeof idParamsSchema>;
+    const { content, parentId } = req.body as z.infer<typeof commentBodySchema>;
+    const currentUser = req.currentUser!;
+    const knowledge = await getVisibleKnowledgeOrThrow(id, currentUser);
+    let parentComment: { id: string; userId: string; parentId: string | null } | null = null;
+
+    if (parentId) {
+      parentComment = await prisma.comment.findFirst({ where: { id: parentId, knowledgeId: id, deletedAt: null }, select: { id: true, userId: true, parentId: true } });
+      if (!parentComment) {
+        throw new AppError('NOT_FOUND', '评论不存在', 404);
+      }
+      if (parentComment.parentId) {
+        throw new AppError('VALIDATION_ERROR', '暂只支持一级回复', 400);
+      }
+    }
+
+    const comment = await prisma.comment.create({
+      data: { knowledgeId: id, userId: currentUser.id, parentId: parentId ?? null, content },
+      include: { user: { select: { id: true, username: true, displayName: true } }, replies: { include: { user: { select: { id: true, username: true, displayName: true } } } } },
+    });
+
+    if (!parentId && knowledge.authorId !== currentUser.id) {
+      await createNotification({
+        userId: knowledge.authorId,
+        type: NotificationType.KNOWLEDGE_COMMENTED,
+        title: '你的知识收到新评论',
+        content: `${currentUser.displayName} 评论了《${knowledge.title}》。`,
+        relatedId: id,
+      });
+    }
+
+    if (parentComment && parentComment.userId !== currentUser.id) {
+      await createNotification({
+        userId: parentComment.userId,
+        type: NotificationType.COMMENT_REPLIED,
+        title: '你的评论收到回复',
+        content: `${currentUser.displayName} 回复了你在《${knowledge.title}》下的评论。`,
+        relatedId: id,
+      });
+    }
+
+    sendSuccess(res, { comment: toCommentItem(comment) }, 'created', 201);
   }),
 );
 
@@ -602,6 +748,111 @@ knowledgeRouter.patch(
     });
 
     sendSuccess(res, { knowledge: toKnowledgeDetail(updatedKnowledge, currentUser.id) });
+  }),
+);
+
+commentsRouter.use(requireAuth);
+commentsRouter.delete(
+  '/:id',
+  validate({ params: idParamsSchema }),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params as z.infer<typeof idParamsSchema>;
+    const currentUser = req.currentUser!;
+    const comment = await prisma.comment.findFirst({ where: { id, deletedAt: null } });
+    if (!comment) {
+      throw new AppError('NOT_FOUND', '评论不存在', 404);
+    }
+
+    const knowledge = await getVisibleKnowledgeOrThrow(comment.knowledgeId, currentUser);
+    if (currentUser.role !== UserRole.ADMIN && comment.userId !== currentUser.id && knowledge.authorId !== currentUser.id) {
+      throw new AppError('FORBIDDEN', '只能删除自己的评论或自己知识下的评论', 403);
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const deletedAt = new Date();
+      await tx.comment.updateMany({ where: { OR: [{ id }, { parentId: id }], deletedAt: null }, data: { deletedAt } });
+      if (currentUser.role === UserRole.ADMIN) {
+        await tx.auditLog.create({
+          data: {
+            actorId: currentUser.id,
+            action: AuditAction.DELETE_COMMENT,
+            targetType: 'Comment',
+            targetId: id,
+            summary: `删除知识评论 ${knowledge.title}`,
+            metadata: { knowledgeId: knowledge.id },
+          },
+        });
+      }
+    });
+
+    sendSuccess(res, { id });
+  }),
+);
+
+notificationsRouter.use(requireAuth);
+notificationsRouter.get(
+  '/',
+  validate({ query: notificationListQuerySchema }),
+  asyncHandler(async (req, res) => {
+    const currentUser = req.currentUser!;
+    const { page, pageSize, unreadOnly } = req.query as unknown as z.infer<typeof notificationListQuerySchema>;
+    const where: Prisma.NotificationWhereInput = {
+      userId: currentUser.id,
+      deletedAt: null,
+      ...(unreadOnly ? { isRead: false } : {}),
+    };
+
+    const [items, total, unreadCount] = await prisma.$transaction([
+      prisma.notification.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * pageSize, take: pageSize }),
+      prisma.notification.count({ where }),
+      prisma.notification.count({ where: { userId: currentUser.id, deletedAt: null, isRead: false } }),
+    ]);
+
+    sendSuccess(res, {
+      items: items.map(toNotificationItem),
+      page,
+      pageSize,
+      total,
+      totalPages: Math.ceil(total / pageSize),
+      unreadCount,
+    });
+  }),
+);
+
+notificationsRouter.patch(
+  '/read-all',
+  asyncHandler(async (req, res) => {
+    const currentUser = req.currentUser!;
+    await prisma.notification.updateMany({ where: { userId: currentUser.id, deletedAt: null, isRead: false }, data: { isRead: true, readAt: new Date() } });
+    sendSuccess(res, { success: true });
+  }),
+);
+
+notificationsRouter.patch(
+  '/:id/read',
+  validate({ params: idParamsSchema }),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params as z.infer<typeof idParamsSchema>;
+    const notification = await prisma.notification.findFirst({ where: { id, userId: req.currentUser!.id, deletedAt: null } });
+    if (!notification) {
+      throw new AppError('NOT_FOUND', '通知不存在', 404);
+    }
+    const updated = await prisma.notification.update({ where: { id }, data: { isRead: true, readAt: new Date() } });
+    sendSuccess(res, { notification: toNotificationItem(updated) });
+  }),
+);
+
+notificationsRouter.delete(
+  '/:id',
+  validate({ params: idParamsSchema }),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params as z.infer<typeof idParamsSchema>;
+    const notification = await prisma.notification.findFirst({ where: { id, userId: req.currentUser!.id, deletedAt: null } });
+    if (!notification) {
+      throw new AppError('NOT_FOUND', '通知不存在', 404);
+    }
+    await prisma.notification.update({ where: { id }, data: { deletedAt: new Date() } });
+    sendSuccess(res, { id });
   }),
 );
 

@@ -1,4 +1,4 @@
-import { AuditAction, KnowledgeStatus, UserRole } from '@prisma/client';
+import { AuditAction, KnowledgeStatus, NotificationType, UserRole } from '@prisma/client';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -300,6 +300,94 @@ describe('knowledge interaction routes', () => {
 
     const viewRows = await prisma.knowledgeView.findMany({ where: { knowledgeId: knowledge.id, userId: reader.id } });
     expect(viewRows).toHaveLength(1);
+  });
+});
+
+describe('knowledge comment and notification routes', () => {
+  it('creates top-level comments and replies, sends notifications, and manages reads', async () => {
+    const author = await createUser(UserRole.USER);
+    const commenter = await createUser(UserRole.USER);
+    const replier = await createUser(UserRole.USER);
+    const category = await createCategory('Comment Category');
+    const knowledge = await createKnowledge({ authorId: author.id, categoryId: category.id, title: 'Commented Knowledge' });
+
+    const commentResponse = await request(app)
+      .post(`/api/knowledge/${knowledge.id}/comments`)
+      .set('Authorization', authHeaderFor(commenter))
+      .send({ content: 'This is a helpful note.' })
+      .expect(201);
+    expect(commentResponse.body.data.comment).toMatchObject({ content: 'This is a helpful note.', user: { id: commenter.id } });
+    const commentId = commentResponse.body.data.comment.id as string;
+
+    const replyResponse = await request(app)
+      .post(`/api/knowledge/${knowledge.id}/comments`)
+      .set('Authorization', authHeaderFor(replier))
+      .send({ content: 'Replying to the note.', parentId: commentId })
+      .expect(201);
+    expect(replyResponse.body.data.comment).toMatchObject({ content: 'Replying to the note.', parentId: commentId, user: { id: replier.id } });
+
+    const listResponse = await request(app).get(`/api/knowledge/${knowledge.id}/comments`).set('Authorization', authHeaderFor(author)).expect(200);
+    expect(listResponse.body.data.items).toEqual([
+      expect.objectContaining({ id: commentId, replies: [expect.objectContaining({ id: replyResponse.body.data.comment.id })] }),
+    ]);
+
+    const authorNotifications = await prisma.notification.findMany({ where: { userId: author.id, relatedId: knowledge.id } });
+    expect(authorNotifications).toEqual([expect.objectContaining({ type: NotificationType.KNOWLEDGE_COMMENTED, isRead: false })]);
+
+    const commenterNotifications = await prisma.notification.findMany({ where: { userId: commenter.id, relatedId: knowledge.id } });
+    expect(commenterNotifications).toEqual([expect.objectContaining({ type: NotificationType.COMMENT_REPLIED, isRead: false })]);
+
+    const notificationList = await request(app).get('/api/notifications').set('Authorization', authHeaderFor(author)).expect(200);
+    expect(notificationList.body.data.unreadCount).toBeGreaterThanOrEqual(1);
+    const notificationId = notificationList.body.data.items[0].id;
+
+    const readResponse = await request(app).patch(`/api/notifications/${notificationId}/read`).set('Authorization', authHeaderFor(author)).expect(200);
+    expect(readResponse.body.data.notification).toMatchObject({ id: notificationId, isRead: true });
+
+    await request(app).patch('/api/notifications/read-all').set('Authorization', authHeaderFor(commenter)).expect(200);
+    const afterReadAll = await request(app).get('/api/notifications').set('Authorization', authHeaderFor(commenter)).expect(200);
+    expect(afterReadAll.body.data.unreadCount).toBe(0);
+
+    await request(app).delete(`/api/notifications/${notificationId}`).set('Authorization', authHeaderFor(author)).expect(200);
+    const deletedNotification = await prisma.notification.findUnique({ where: { id: notificationId } });
+    expect(deletedNotification?.deletedAt).toBeTruthy();
+  });
+
+  it('enforces comment depth and delete permissions', async () => {
+    const author = await createUser(UserRole.USER);
+    const commenter = await createUser(UserRole.USER);
+    const other = await createUser(UserRole.USER);
+    const admin = await createUser(UserRole.ADMIN);
+    const category = await createCategory('Comment Permission Category');
+    const knowledge = await createKnowledge({ authorId: author.id, categoryId: category.id });
+
+    const commentResponse = await request(app)
+      .post(`/api/knowledge/${knowledge.id}/comments`)
+      .set('Authorization', authHeaderFor(commenter))
+      .send({ content: 'Parent comment' })
+      .expect(201);
+    const parentId = commentResponse.body.data.comment.id as string;
+
+    const replyResponse = await request(app)
+      .post(`/api/knowledge/${knowledge.id}/comments`)
+      .set('Authorization', authHeaderFor(other))
+      .send({ content: 'First reply', parentId })
+      .expect(201);
+
+    await request(app)
+      .post(`/api/knowledge/${knowledge.id}/comments`)
+      .set('Authorization', authHeaderFor(author))
+      .send({ content: 'Too deep', parentId: replyResponse.body.data.comment.id })
+      .expect(400);
+
+    await request(app).delete(`/api/comments/${parentId}`).set('Authorization', authHeaderFor(other)).expect(403);
+    await request(app).delete(`/api/comments/${parentId}`).set('Authorization', authHeaderFor(admin)).expect(200);
+
+    const deletedComments = await prisma.comment.findMany({ where: { id: { in: [parentId, replyResponse.body.data.comment.id] } } });
+    expect(deletedComments.every((comment) => comment.deletedAt)).toBe(true);
+
+    const auditLog = await prisma.auditLog.findFirst({ where: { actorId: admin.id, action: AuditAction.DELETE_COMMENT, targetId: parentId } });
+    expect(auditLog).toBeTruthy();
   });
 });
 

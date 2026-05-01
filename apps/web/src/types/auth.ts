@@ -22,3 +22,18 @@ export type LoginResult = {
   token: string;
   user: CurrentUser;
 };
+
+export type UserListResult = {
+  items: CurrentUser[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
+export type CreateUserPayload = {
+  username: string;
+  displayName: string;
+  password: string;
+  role: UserRole;
+};

@@ -10,6 +10,7 @@ import {
   NH2,
   NInput,
   NInputNumber,
+  NPopconfirm,
   NP,
   NSelect,
   NSpace,
@@ -30,6 +31,8 @@ const loading = ref(false);
 const categories = ref<CategoryNode[]>([]);
 const tags = ref<TagItem[]>([]);
 const selectedTagIds = ref<string[]>([]);
+const categoryEditingId = ref<string | null>(null);
+const tagEditingId = ref<string | null>(null);
 
 const categoryForm = reactive({
   name: '',
@@ -69,7 +72,10 @@ const categoryColumns: DataTableColumns<CategoryNode & { depth: number }> = [
     key: 'actions',
     width: 130,
     render(row) {
-      return hDeleteButton('删除', () => deleteCategory(row.id));
+      return h(NSpace, () => [
+        h(NButton, { size: 'small', secondary: true, onClick: () => editCategory(row) }, { default: () => '编辑' }),
+        hDeleteButton('删除', () => deleteCategory(row.id)),
+      ]);
     },
   },
 ];
@@ -82,16 +88,22 @@ const tagColumns: DataTableColumns<TagItem> = [
     key: 'actions',
     width: 130,
     render(row) {
-      return hDeleteButton('删除', () => deleteTag(row.id));
+      return h(NSpace, () => [
+        h(NButton, { size: 'small', secondary: true, onClick: () => editTag(row) }, { default: () => '编辑' }),
+        hDeleteButton('删除', () => deleteTag(row.id)),
+      ]);
     },
   },
 ];
 
 function hDeleteButton(label: string, onClick: () => void) {
   return h(
-    NButton,
-    { size: 'small', tertiary: true, type: 'error', onClick },
-    { default: () => label },
+    NPopconfirm,
+    { onPositiveClick: onClick },
+    {
+      trigger: () => h(NButton, { size: 'small', tertiary: true, type: 'error' }, { default: () => label }),
+      default: () => `确认${label}吗？`,
+    },
   );
 }
 
@@ -106,22 +118,36 @@ const loadTaxonomy = async () => {
   }
 };
 
-const createCategory = async () => {
+const saveCategory = async () => {
   if (!categoryForm.name.trim()) {
     message.warning('请输入分类名称');
     return;
   }
 
-  await taxonomyApi.createCategory({
+  const payload = {
     name: categoryForm.name,
     parentId: categoryForm.parentId || null,
     sortOrder: categoryForm.sortOrder,
-  });
-  message.success('分类已创建');
+  };
+  if (categoryEditingId.value) {
+    await taxonomyApi.updateCategory(categoryEditingId.value, payload);
+    message.success('分类已更新');
+  } else {
+    await taxonomyApi.createCategory(payload);
+    message.success('分类已创建');
+  }
+  categoryEditingId.value = null;
   categoryForm.name = '';
   categoryForm.parentId = '';
   categoryForm.sortOrder = 0;
   await loadTaxonomy();
+};
+
+const editCategory = (category: CategoryNode) => {
+  categoryEditingId.value = category.id;
+  categoryForm.name = category.name;
+  categoryForm.parentId = category.parentId ?? '';
+  categoryForm.sortOrder = category.sortOrder;
 };
 
 const deleteCategory = async (id: string) => {
@@ -130,16 +156,27 @@ const deleteCategory = async (id: string) => {
   await loadTaxonomy();
 };
 
-const createTag = async () => {
+const saveTag = async () => {
   if (!tagForm.name.trim()) {
     message.warning('请输入标签名称');
     return;
   }
 
-  await taxonomyApi.createTag({ name: tagForm.name });
-  message.success('标签已创建');
+  if (tagEditingId.value) {
+    await taxonomyApi.updateTag(tagEditingId.value, { name: tagForm.name });
+    message.success('标签已更新');
+  } else {
+    await taxonomyApi.createTag({ name: tagForm.name });
+    message.success('标签已创建');
+  }
+  tagEditingId.value = null;
   tagForm.name = '';
   await loadTaxonomy();
+};
+
+const editTag = (tag: TagItem) => {
+  tagEditingId.value = tag.id;
+  tagForm.name = tag.name;
 };
 
 const deleteTag = async (id: string) => {
@@ -191,7 +228,7 @@ import { h } from 'vue';
               <NFormItem label="排序值">
                 <NInputNumber v-model:value="categoryForm.sortOrder" :min="0" :max="9999" />
               </NFormItem>
-              <NButton type="primary" :loading="loading" @click="createCategory">创建分类</NButton>
+              <NButton type="primary" :loading="loading" @click="saveCategory">{{ categoryEditingId ? '保存分类' : '创建分类' }}</NButton>
             </NForm>
           </NCard>
         </NGi>
@@ -202,7 +239,7 @@ import { h } from 'vue';
               <NFormItem label="标签名称">
                 <NInput v-model:value="tagForm.name" placeholder="例如：Vue" />
               </NFormItem>
-              <NButton type="primary" :loading="loading" @click="createTag">创建标签</NButton>
+              <NButton type="primary" :loading="loading" @click="saveTag">{{ tagEditingId ? '保存标签' : '创建标签' }}</NButton>
             </NForm>
           </NCard>
         </NGi>

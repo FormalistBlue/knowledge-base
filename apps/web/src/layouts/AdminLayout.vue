@@ -35,6 +35,14 @@ const menuOptions = [
     label: '分类标签',
     key: 'admin-taxonomy',
   },
+  {
+    label: '文章管理',
+    key: 'admin-knowledge',
+  },
+  {
+    label: '评论管理',
+    key: 'admin-comments',
+  },
 ];
 
 const handleMenuUpdate = async (key: string) => {

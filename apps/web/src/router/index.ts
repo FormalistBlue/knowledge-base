@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router';
 
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import MainLayout from '@/layouts/MainLayout.vue';
+import AdminCommentsPage from '@/pages/AdminCommentsPage.vue';
+import AdminKnowledgePage from '@/pages/AdminKnowledgePage.vue';
 import AdminTaxonomyPage from '@/pages/AdminTaxonomyPage.vue';
 import AdminUsersPage from '@/pages/AdminUsersPage.vue';
 import HomePage from '@/pages/HomePage.vue';
@@ -52,6 +54,12 @@ const router = createRouter({
           meta: { requiresAuth: true },
         },
         {
+          path: 'notifications',
+          name: 'notifications',
+          component: () => import('@/pages/NotificationsPage.vue'),
+          meta: { requiresAuth: true },
+        },
+        {
           path: 'knowledge/:id',
           name: 'knowledge-detail',
           component: KnowledgeDetailPage,
@@ -84,6 +92,18 @@ const router = createRouter({
           path: 'taxonomy',
           name: 'admin-taxonomy',
           component: AdminTaxonomyPage,
+          meta: { requiresAuth: true, requiresAdmin: true },
+        },
+        {
+          path: 'knowledge',
+          name: 'admin-knowledge',
+          component: AdminKnowledgePage,
+          meta: { requiresAuth: true, requiresAdmin: true },
+        },
+        {
+          path: 'comments',
+          name: 'admin-comments',
+          component: AdminCommentsPage,
           meta: { requiresAuth: true, requiresAdmin: true },
         },
       ],

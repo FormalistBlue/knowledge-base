@@ -23,6 +23,13 @@ export const knowledgeApi = {
     return response.data;
   },
 
+  async adminList(params: KnowledgeListParams = {}): Promise<KnowledgeListResult> {
+    const response = await http.get<unknown, ApiResponse<KnowledgeListResult>>('/knowledge', {
+      params: toQueryParams({ ...params, onlyMine: false }),
+    });
+    return response.data;
+  },
+
   async home(): Promise<KnowledgeHomeResult> {
     const response = await http.get<unknown, ApiResponse<KnowledgeHomeResult>>('/knowledge/home');
     return response.data;
@@ -79,6 +86,16 @@ export const knowledgeApi = {
 
   async pin(id: string, isPinned: boolean): Promise<KnowledgeSummary> {
     const response = await http.patch<unknown, ApiResponse<{ knowledge: KnowledgeSummary }>>(`/admin/knowledge/${id}/pin`, { isPinned });
+    return response.data.knowledge;
+  },
+
+  async updateCategory(id: string, categoryId: string): Promise<KnowledgeSummary> {
+    const response = await http.patch<unknown, ApiResponse<{ knowledge: KnowledgeSummary }>>(`/admin/knowledge/${id}/category`, { categoryId });
+    return response.data.knowledge;
+  },
+
+  async updateTags(id: string, tagIds: string[]): Promise<KnowledgeSummary> {
+    const response = await http.patch<unknown, ApiResponse<{ knowledge: KnowledgeSummary }>>(`/admin/knowledge/${id}/tags`, { tagIds });
     return response.data.knowledge;
   },
 };

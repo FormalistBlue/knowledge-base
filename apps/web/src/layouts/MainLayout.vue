@@ -41,6 +41,7 @@ const handleLogout = async () => {
         <NSpace align="center">
           <NButton quaternary @click="router.push({ name: 'knowledge-list' })">知识库</NButton>
           <NButton quaternary @click="router.push({ name: 'my-favorites' })">我的收藏</NButton>
+          <NButton quaternary @click="router.push({ name: 'notifications' })">通知</NButton>
           <NButton type="primary" secondary @click="router.push({ name: 'knowledge-create' })">创建知识</NButton>
           <NButton v-if="authStore.isAdmin" secondary @click="router.push({ name: 'admin-users' })">
             后台管理

@@ -62,7 +62,7 @@ export type KnowledgeListParams = {
   status?: KnowledgeStatus;
   publishedFrom?: string;
   publishedTo?: string;
-  sortBy?: 'publishedAt' | 'viewCount' | 'updatedAt';
+  sortBy?: 'publishedAt' | 'viewCount' | 'updatedAt' | 'createdAt';
   sortOrder?: 'asc' | 'desc';
   onlyMine?: boolean;
 };
