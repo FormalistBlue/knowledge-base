@@ -31,6 +31,10 @@ const menuOptions = [
     label: '用户管理',
     key: 'admin-users',
   },
+  {
+    label: '分类标签',
+    key: 'admin-taxonomy',
+  },
 ];
 
 const handleMenuUpdate = async (key: string) => {

@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import MainLayout from '@/layouts/MainLayout.vue';
+import AdminTaxonomyPage from '@/pages/AdminTaxonomyPage.vue';
 import AdminUsersPage from '@/pages/AdminUsersPage.vue';
 import HomePage from '@/pages/HomePage.vue';
 import LoginPage from '@/pages/LoginPage.vue';
@@ -42,6 +43,11 @@ const router = createRouter({
           path: 'users',
           name: 'admin-users',
           component: AdminUsersPage,
+        },
+        {
+          path: 'taxonomy',
+          name: 'admin-taxonomy',
+          component: AdminTaxonomyPage,
         },
       ],
     },
