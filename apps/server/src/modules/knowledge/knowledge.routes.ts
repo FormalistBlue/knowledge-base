@@ -118,7 +118,15 @@ const ensureTagsExist = async (tagIds: string[]) => {
   return uniqueTagIds;
 };
 
-const ensureTempAttachmentsExist = async (attachmentIds: string[], uploaderId: string) => {
+const ensureBindableAttachmentsExist = async ({
+  attachmentIds,
+  uploaderId,
+  knowledgeId,
+}: {
+  attachmentIds: string[];
+  uploaderId: string;
+  knowledgeId?: string;
+}) => {
   const uniqueAttachmentIds = [...new Set(attachmentIds)];
   if (uniqueAttachmentIds.length === 0) {
     return uniqueAttachmentIds;
@@ -127,8 +135,11 @@ const ensureTempAttachmentsExist = async (attachmentIds: string[], uploaderId: s
   const attachments = await prisma.attachment.findMany({
     where: {
       id: { in: uniqueAttachmentIds },
-      uploaderId,
       deletedAt: null,
+      OR: [
+        { uploaderId, status: AttachmentStatus.TEMP, knowledgeId: null },
+        ...(knowledgeId ? [{ knowledgeId, status: AttachmentStatus.BOUND }] : []),
+      ],
     },
     select: { id: true },
   });
@@ -167,7 +178,7 @@ const bindAttachments = async ({
   attachmentIds: string[];
   uploaderId: string;
 }) => {
-  const uniqueAttachmentIds = await ensureTempAttachmentsExist(attachmentIds, uploaderId);
+  const uniqueAttachmentIds = await ensureBindableAttachmentsExist({ attachmentIds, uploaderId, knowledgeId });
   const now = new Date();
 
   await tx.attachment.updateMany({
@@ -177,7 +188,7 @@ const bindAttachments = async ({
 
   if (uniqueAttachmentIds.length > 0) {
     await tx.attachment.updateMany({
-      where: { id: { in: uniqueAttachmentIds }, uploaderId, deletedAt: null },
+      where: { id: { in: uniqueAttachmentIds }, deletedAt: null },
       data: { knowledgeId, status: AttachmentStatus.BOUND, boundAt: now },
     });
   }
@@ -279,7 +290,7 @@ knowledgeRouter.get(
         where.status = status;
       }
     } else {
-      where.status = status === KnowledgeStatus.ARCHIVED ? KnowledgeStatus.ARCHIVED : KnowledgeStatus.PUBLISHED;
+      where.status = KnowledgeStatus.PUBLISHED;
     }
 
     const [items, total] = await prisma.$transaction([
@@ -352,7 +363,7 @@ knowledgeRouter.get(
       throw new AppError('NOT_FOUND', '知识不存在', 404);
     }
 
-    if (knowledge.status === KnowledgeStatus.DRAFT && !canManageKnowledge(knowledge, currentUser)) {
+    if (knowledge.status !== KnowledgeStatus.PUBLISHED && !canManageKnowledge(knowledge, currentUser)) {
       throw new AppError('NOT_FOUND', '知识不存在', 404);
     }
 

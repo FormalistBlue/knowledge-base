@@ -216,6 +216,31 @@ describe('knowledge search and home routes', () => {
     expect(response.body.data.categories.some((item: { id: string; knowledgeCount: number }) => item.id === category.id && item.knowledgeCount >= 2)).toBe(true);
     expect(response.body.data.tags.some((item: { id: string; knowledgeCount: number }) => item.id === tag.id && item.knowledgeCount >= 2)).toBe(true);
   });
+
+  it('does not expose archived knowledge to normal users in list or detail pages', async () => {
+    const author = await createUser(UserRole.USER);
+    const otherUser = await createUser(UserRole.USER);
+    const admin = await createUser(UserRole.ADMIN);
+    const category = await createCategory('Archived Category');
+    const archivedKnowledge = await createKnowledge({
+      authorId: author.id,
+      categoryId: category.id,
+      title: 'Archived Internal Note',
+      status: KnowledgeStatus.ARCHIVED,
+      publishedAt: new Date(),
+    });
+
+    await request(app).get(`/api/knowledge/${archivedKnowledge.id}`).set('Authorization', authHeaderFor(otherUser)).expect(404);
+
+    const userListResponse = await request(app)
+      .get('/api/knowledge')
+      .query({ status: KnowledgeStatus.ARCHIVED })
+      .set('Authorization', authHeaderFor(otherUser))
+      .expect(200);
+    expect(userListResponse.body.data.items.some((item: { id: string }) => item.id === archivedKnowledge.id)).toBe(false);
+
+    await request(app).get(`/api/knowledge/${archivedKnowledge.id}`).set('Authorization', authHeaderFor(admin)).expect(200);
+  });
 });
 
 describe('knowledge CRUD routes', () => {

@@ -204,6 +204,70 @@ describe('file upload routes', () => {
     expect(bound.boundAt).toBeTruthy();
   });
 
+  it('keeps temporary files private to their uploader before they are bound to knowledge', async () => {
+    const uploader = await createUser();
+    const otherUser = await createUser();
+    const uploadResponse = await request(app)
+      .post('/api/files/images')
+      .set('Authorization', authHeaderFor(uploader))
+      .attach('file', Buffer.from('private image'), { filename: 'private.png', contentType: 'image/png' })
+      .expect(201);
+    const fileId = uploadResponse.body.data.file.id;
+    createdAttachmentIds.push(fileId);
+
+    await request(app).get(`/api/files/${fileId}/preview`).set('Authorization', authHeaderFor(uploader)).expect(200);
+    await request(app).get(`/api/files/${fileId}/preview`).set('Authorization', authHeaderFor(otherUser)).expect(404);
+    await request(app).get(`/api/files/${fileId}/download`).set('Authorization', authHeaderFor(otherUser)).expect(404);
+  });
+
+  it('allows an admin to update another user knowledge without dropping existing bound attachments', async () => {
+    const author = await createUser(UserRole.USER);
+    const admin = await createUser(UserRole.ADMIN);
+    const category = await createCategory();
+    const authorAuth = authHeaderFor(author);
+    const uploadResponse = await request(app)
+      .post('/api/files/attachments')
+      .set('Authorization', authorAuth)
+      .attach('file', Buffer.from('admin keep'), { filename: 'admin-keep.md', contentType: 'text/markdown' })
+      .expect(201);
+    const attachmentId = uploadResponse.body.data.file.id;
+    createdAttachmentIds.push(attachmentId);
+
+    const createResponse = await request(app)
+      .post('/api/knowledge')
+      .set('Authorization', authorAuth)
+      .send({
+        title: 'Admin Editable Knowledge',
+        summary: 'Knowledge summary',
+        content: '# Content',
+        status: KnowledgeStatus.PUBLISHED,
+        categoryId: category.id,
+        tagIds: [],
+        attachmentIds: [attachmentId],
+      })
+      .expect(201);
+    const knowledge = createResponse.body.data.knowledge;
+    createdKnowledgeIds.push(knowledge.id);
+
+    const updateResponse = await request(app)
+      .put(`/api/knowledge/${knowledge.id}`)
+      .set('Authorization', authHeaderFor(admin))
+      .send({
+        title: 'Admin Updated Knowledge',
+        summary: 'Knowledge summary updated',
+        content: '# Updated Content',
+        status: KnowledgeStatus.PUBLISHED,
+        categoryId: category.id,
+        tagIds: [],
+        attachmentIds: [attachmentId],
+      })
+      .expect(200);
+
+    expect(updateResponse.body.data.knowledge.attachments).toHaveLength(1);
+    const attachment = await prisma.attachment.findUniqueOrThrow({ where: { id: attachmentId } });
+    expect(attachment).toMatchObject({ knowledgeId: knowledge.id, status: AttachmentStatus.BOUND });
+  });
+
   it('cleans temporary files older than 24 hours', async () => {
     const user = await createUser();
     const auth = authHeaderFor(user);

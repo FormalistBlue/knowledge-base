@@ -18,7 +18,7 @@ import {
   useMessage,
   type SelectOption,
 } from 'naive-ui';
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { knowledgeApi } from '@/api/knowledge';
@@ -143,6 +143,15 @@ onMounted(async () => {
   applyRouteQuery();
   await Promise.all([loadFilters(), loadKnowledge()]);
 });
+
+watch(
+  () => route.query,
+  async () => {
+    applyRouteQuery();
+    query.page = 1;
+    await loadKnowledge();
+  },
+);
 </script>
 
 <template>

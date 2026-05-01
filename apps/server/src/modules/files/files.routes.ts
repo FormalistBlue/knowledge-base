@@ -63,9 +63,12 @@ const uploadFile = async (req: Request, usageType: AttachmentUsageType) => {
   return attachment;
 };
 
-const getAttachmentOrThrow = async (id: string) => {
+const getAttachmentOrThrow = async (id: string, userId: string) => {
   const attachment = await prisma.attachment.findFirst({ where: { id, deletedAt: null } });
   if (!attachment) {
+    throw new AppError('NOT_FOUND', '文件不存在', 404);
+  }
+  if (attachment.status === AttachmentStatus.TEMP && attachment.uploaderId !== userId) {
     throw new AppError('NOT_FOUND', '文件不存在', 404);
   }
   return attachment;
@@ -96,7 +99,7 @@ filesRouter.get(
   validate({ params: idParamsSchema }),
   asyncHandler(async (req, res) => {
     const { id } = req.params as z.infer<typeof idParamsSchema>;
-    const attachment = await getAttachmentOrThrow(id);
+    const attachment = await getAttachmentOrThrow(id, req.currentUser!.id);
     if (!previewExtensions.has(attachment.extension)) {
       throw new AppError('FILE_TYPE_NOT_ALLOWED', '该文件类型不支持预览，请下载查看', 400);
     }
@@ -119,7 +122,7 @@ filesRouter.get(
   validate({ params: idParamsSchema }),
   asyncHandler(async (req, res) => {
     const { id } = req.params as z.infer<typeof idParamsSchema>;
-    const attachment = await getAttachmentOrThrow(id);
+    const attachment = await getAttachmentOrThrow(id, req.currentUser!.id);
     const absolutePath = resolveAttachmentPath(attachment.relativePath);
     try {
       await fs.access(absolutePath);
