@@ -121,6 +121,19 @@ describe('file upload routes', () => {
     expect(response.body).toMatchObject({ code: 'FILE_TYPE_NOT_ALLOWED' });
   });
 
+  it('rejects uploads larger than the configured size limit', async () => {
+    const user = await createUser();
+    const oversizedBuffer = Buffer.alloc(101 * 1024 * 1024);
+
+    const response = await request(app)
+      .post('/api/files/attachments')
+      .set('Authorization', authHeaderFor(user))
+      .attach('file', oversizedBuffer, { filename: 'too-large.txt', contentType: 'text/plain' })
+      .expect(400);
+
+    expect(response.body).toMatchObject({ code: 'FILE_TOO_LARGE' });
+  });
+
   it('previews images and PDFs, downloads attachments, and blocks preview for Office files', async () => {
     const user = await createUser();
     const auth = authHeaderFor(user);

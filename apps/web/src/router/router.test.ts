@@ -10,8 +10,13 @@ describe('router configuration', () => {
     expect(router.hasRoute('knowledge-create')).toBe(true);
     expect(router.hasRoute('knowledge-detail')).toBe(true);
     expect(router.hasRoute('knowledge-edit')).toBe(true);
+    expect(router.hasRoute('admin-dashboard')).toBe(true);
     expect(router.hasRoute('admin-users')).toBe(true);
     expect(router.hasRoute('admin-taxonomy')).toBe(true);
+    expect(router.hasRoute('admin-knowledge')).toBe(true);
+    expect(router.hasRoute('admin-comments')).toBe(true);
+    expect(router.hasRoute('admin-audit-logs')).toBe(true);
+    expect(router.hasRoute('notifications')).toBe(true);
     expect(router.hasRoute('unauthorized')).toBe(true);
   });
 
