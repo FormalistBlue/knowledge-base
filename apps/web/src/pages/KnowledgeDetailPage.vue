@@ -25,6 +25,7 @@ import { useAuthStore } from '@/stores/auth';
 import type { CommentItem } from '@/types/interactions';
 import type { KnowledgeDetail } from '@/types/knowledge';
 import { downloadFile, previewFile } from '@/utils/file-actions';
+import { renderMarkdown } from '@/utils/markdown';
 
 const route = useRoute();
 const router = useRouter();
@@ -153,7 +154,7 @@ onMounted(loadDetail);
         <NSpace class="knowledge-tags" size="small">
           <NTag v-for="tag in knowledge.tags" :key="tag.id" size="small" type="info">{{ tag.name }}</NTag>
         </NSpace>
-        <article class="markdown-preview">{{ knowledge.content }}</article>
+        <article class="markdown-preview" v-html="renderMarkdown(knowledge.content)"></article>
       </NCard>
 
       <NCard v-if="attachmentFiles.length" title="附件下载">
@@ -181,7 +182,7 @@ onMounted(loadDetail);
             <NListItem v-for="comment in comments" :key="comment.id">
               <NSpace vertical size="small">
                 <NText strong>{{ comment.user.displayName }}</NText>
-                <article class="markdown-preview comment-content">{{ comment.content }}</article>
+                <article class="markdown-preview comment-content" v-html="renderMarkdown(comment.content)"></article>
                 <NSpace align="center">
                   <NText depth="3">{{ new Date(comment.createdAt).toLocaleString() }}</NText>
                   <NPopconfirm v-if="canDeleteComment(comment)" @positive-click="deleteComment(comment)">
@@ -193,7 +194,7 @@ onMounted(loadDetail);
                   <NListItem v-for="reply in comment.replies" :key="reply.id">
                     <NSpace vertical size="small">
                       <NText strong>{{ reply.user.displayName }}</NText>
-                      <article class="markdown-preview comment-content">{{ reply.content }}</article>
+                      <article class="markdown-preview comment-content" v-html="renderMarkdown(reply.content)"></article>
                       <NSpace align="center">
                         <NText depth="3">{{ new Date(reply.createdAt).toLocaleString() }}</NText>
                         <NPopconfirm v-if="canDeleteComment(reply)" @positive-click="deleteComment(reply)">

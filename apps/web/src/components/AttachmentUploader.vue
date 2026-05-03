@@ -63,7 +63,7 @@ const removeFile = (fileId: string) => {
       <NUpload :custom-request="handleUpload" :show-file-list="false" :disabled="uploading">
         <NButton :loading="uploading">上传附件</NButton>
       </NUpload>
-      <NText depth="3">支持 PDF、Word、Excel、PPT、TXT、Markdown、ZIP 等文件，单个文件最大 100MB。</NText>
+      <NText depth="3">支持 PDF、Word、Excel、PPT、TXT、Markdown、ZIP 等文件，单个文件最大 50MB。</NText>
       <NProgress v-if="uploading || uploadPercent" type="line" :percentage="uploadPercent" processing />
 
       <NList v-if="attachmentFiles.length" bordered>

@@ -154,7 +154,46 @@ body {
   background: rgba(47, 93, 80, 0.06);
   color: inherit;
   line-height: 1.9;
-  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.markdown-preview :first-child {
+  margin-top: 0;
+}
+
+.markdown-preview :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-preview pre {
+  overflow-x: auto;
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(24, 36, 33, 0.86);
+  color: #f5efe4;
+}
+
+.markdown-preview code {
+  padding: 2px 5px;
+  border-radius: 6px;
+  background: rgba(47, 93, 80, 0.12);
+}
+
+.markdown-preview pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.markdown-preview blockquote {
+  margin: 16px 0;
+  padding-left: 16px;
+  border-left: 4px solid rgba(47, 93, 80, 0.35);
+  color: #6b6258;
+}
+
+.markdown-preview img {
+  max-width: 100%;
+  border-radius: 12px;
 }
 
 .image-grid {

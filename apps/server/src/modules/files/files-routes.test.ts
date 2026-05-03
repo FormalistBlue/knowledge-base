@@ -123,7 +123,7 @@ describe('file upload routes', () => {
 
   it('rejects uploads larger than the configured size limit', async () => {
     const user = await createUser();
-    const oversizedBuffer = Buffer.alloc(101 * 1024 * 1024);
+    const oversizedBuffer = Buffer.alloc(51 * 1024 * 1024);
 
     const response = await request(app)
       .post('/api/files/attachments')
