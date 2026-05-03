@@ -11,21 +11,21 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@vicons/ionicons5": "latest",
-    "axios": "latest",
-    "naive-ui": "latest",
-    "pinia": "latest",
-    "vue": "latest",
-    "vue-router": "latest"
+    "@vicons/ionicons5": "^0.13.0",
+    "axios": "^1.15.2",
+    "naive-ui": "^2.44.1",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.33",
+    "vue-router": "^5.0.6"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "latest",
+    "@vitejs/plugin-vue": "^6.0.6",
     "@vue/test-utils": "^2.4.9",
-    "@vue/tsconfig": "latest",
+    "@vue/tsconfig": "^0.9.1",
     "jsdom": "^29.1.0",
-    "typescript": "latest",
-    "vite": "latest",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.10",
     "vitest": "^4.1.5",
-    "vue-tsc": "latest"
+    "vue-tsc": "^3.2.7"
   }
 }

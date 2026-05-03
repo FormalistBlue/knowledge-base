@@ -1,4 +1,4 @@
-import cors from 'cors';
+import cors, { type CorsOptions } from 'cors';
 import express from 'express';
 import helmet from 'helmet';
 import { z } from 'zod';
@@ -17,13 +17,21 @@ import { adminTagsRouter, tagsRouter } from './modules/taxonomy/tags.routes.js';
 import { AppError } from './utils/app-error.js';
 import { asyncHandler } from './utils/async-handler.js';
 import { sendSuccess } from './utils/response.js';
+import { env } from './config/env.js';
+
+const parseCorsOrigin = (): CorsOptions['origin'] => {
+  if (env.CORS_ORIGIN) {
+    return env.CORS_ORIGIN.split(',').map((origin) => origin.trim()).filter(Boolean);
+  }
+  return env.NODE_ENV === 'production' ? false : true;
+};
 
 export const createApp = () => {
   const app = express();
 
   app.use(requestLogger);
   app.use(helmet());
-  app.use(cors());
+  app.use(cors({ origin: parseCorsOrigin() }));
   app.use(express.json({ limit: '1mb' }));
 
   app.get('/api/health', (_req, res) => {
@@ -63,19 +71,21 @@ export const createApp = () => {
   app.use('/api/admin/categories', adminCategoriesRouter);
   app.use('/api/admin/tags', adminTagsRouter);
 
-  app.get(
-    '/api/dev/validate-demo',
-    validate({
-      query: z.object({
-        keyword: z.string().min(2),
+  if (env.NODE_ENV !== 'production') {
+    app.get(
+      '/api/dev/validate-demo',
+      validate({
+        query: z.object({
+          keyword: z.string().min(2),
+        }),
       }),
-    }),
-    (req, res) => {
-      sendSuccess(res, {
-        keyword: req.query.keyword,
-      });
-    },
-  );
+      (req, res) => {
+        sendSuccess(res, {
+          keyword: req.query.keyword,
+        });
+      },
+    );
+  }
 
   app.use((_req, _res, next) => {
     next(new AppError('NOT_FOUND', '接口不存在', 404));

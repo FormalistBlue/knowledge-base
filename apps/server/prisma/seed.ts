@@ -7,6 +7,10 @@ const adminUsername = process.env.ADMIN_USERNAME ?? 'admin';
 const adminPassword = process.env.ADMIN_PASSWORD ?? 'change_me_123456';
 const adminDisplayName = process.env.ADMIN_DISPLAY_NAME ?? '管理员';
 
+const normalizeCategoryName = (name: string) => name.trim().toLowerCase();
+const normalizeCategoryParentId = (parentId: string | null | undefined) => parentId ?? '__ROOT__';
+const makeActiveCategoryKey = (parentId: string | null | undefined, name: string) =>
+  `${normalizeCategoryParentId(parentId)}:${normalizeCategoryName(name)}`;
 const normalizeTagName = (name: string) => name.trim().toLowerCase();
 
 async function seedAdmin() {
@@ -50,6 +54,7 @@ async function upsertRootCategory(name: string, sortOrder: number) {
   return prisma.category.create({
     data: {
       name,
+      activeKey: makeActiveCategoryKey(null, name),
       sortOrder,
     },
   });
@@ -72,6 +77,7 @@ async function upsertChildCategory(name: string, parentId: string, sortOrder: nu
     data: {
       name,
       parentId,
+      activeKey: makeActiveCategoryKey(parentId, name),
       sortOrder,
     },
   });

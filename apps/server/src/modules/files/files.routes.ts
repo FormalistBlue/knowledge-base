@@ -1,4 +1,4 @@
-import { AttachmentStatus, AttachmentUsageType } from '@prisma/client';
+import { AttachmentStatus, AttachmentUsageType, KnowledgeStatus, UserRole } from '@prisma/client';
 import type { ErrorRequestHandler, Request } from 'express';
 import { Router } from 'express';
 import fs from 'node:fs/promises';
@@ -7,7 +7,7 @@ import path from 'node:path';
 import { z } from 'zod';
 
 import { env } from '../../config/env.js';
-import { requireAuth } from '../../middlewares/auth.js';
+import { requireAdmin, requireAuth } from '../../middlewares/auth.js';
 import { validate } from '../../middlewares/validate.js';
 import { AppError } from '../../utils/app-error.js';
 import { asyncHandler } from '../../utils/async-handler.js';
@@ -43,34 +43,54 @@ const uploadFile = async (req: Request, usageType: AttachmentUsageType) => {
   const extension = getExtension(originalName);
   assertAllowedFile({ usageType, extension, mimeType: file.mimetype });
 
-  const stored = await buildStoredPath(extension);
-  await fs.writeFile(stored.absolutePath, file.buffer, { flag: 'wx' });
+  const { storedName, relativePath, absolutePath } = await buildStoredPath(extension);
+  await fs.writeFile(absolutePath, file.buffer);
 
-  const attachment = await prisma.attachment.create({
-    data: {
-      uploaderId: currentUser.id,
-      usageType,
-      status: AttachmentStatus.TEMP,
-      originalName,
-      storedName: stored.storedName,
-      relativePath: stored.relativePath,
-      fileSize: file.size,
-      mimeType: file.mimetype,
-      extension,
-    },
-  });
+  try {
+    const attachment = await prisma.attachment.create({
+      data: {
+        uploaderId: currentUser.id,
+        usageType,
+        status: AttachmentStatus.TEMP,
+        originalName,
+        storedName,
+        relativePath,
+        fileSize: file.size,
+        mimeType: file.mimetype,
+        extension,
+      },
+    });
 
-  return attachment;
+    return attachment;
+  } catch (error) {
+    await fs.rm(absolutePath, { force: true });
+    throw error;
+  }
 };
 
-const getAttachmentOrThrow = async (id: string, userId: string) => {
-  const attachment = await prisma.attachment.findFirst({ where: { id, deletedAt: null } });
+const getAttachmentOrThrow = async (id: string, user: NonNullable<Request['currentUser']>) => {
+  const attachment = await prisma.attachment.findFirst({
+    where: { id, deletedAt: null },
+    include: { knowledge: { select: { id: true, authorId: true, status: true, deletedAt: true } } },
+  });
   if (!attachment) {
     throw new AppError('NOT_FOUND', '文件不存在', 404);
   }
-  if (attachment.status === AttachmentStatus.TEMP && attachment.uploaderId !== userId) {
+
+  if (attachment.status === AttachmentStatus.TEMP) {
+    if (attachment.uploaderId !== user.id) {
+      throw new AppError('NOT_FOUND', '文件不存在', 404);
+    }
+    return attachment;
+  }
+
+  const knowledge = attachment.knowledge;
+  const canManageKnowledge = knowledge && (user.role === UserRole.ADMIN || knowledge.authorId === user.id);
+  const canReadPublished = knowledge?.status === KnowledgeStatus.PUBLISHED;
+  if (!knowledge || knowledge.deletedAt || (!canReadPublished && !canManageKnowledge)) {
     throw new AppError('NOT_FOUND', '文件不存在', 404);
   }
+
   return attachment;
 };
 
@@ -99,7 +119,7 @@ filesRouter.get(
   validate({ params: idParamsSchema }),
   asyncHandler(async (req, res) => {
     const { id } = req.params as z.infer<typeof idParamsSchema>;
-    const attachment = await getAttachmentOrThrow(id, req.currentUser!.id);
+    const attachment = await getAttachmentOrThrow(id, req.currentUser!);
     if (!previewExtensions.has(attachment.extension)) {
       throw new AppError('FILE_TYPE_NOT_ALLOWED', '该文件类型不支持预览，请下载查看', 400);
     }
@@ -122,7 +142,7 @@ filesRouter.get(
   validate({ params: idParamsSchema }),
   asyncHandler(async (req, res) => {
     const { id } = req.params as z.infer<typeof idParamsSchema>;
-    const attachment = await getAttachmentOrThrow(id, req.currentUser!.id);
+    const attachment = await getAttachmentOrThrow(id, req.currentUser!);
     const absolutePath = resolveAttachmentPath(attachment.relativePath);
     try {
       await fs.access(absolutePath);
@@ -136,6 +156,7 @@ filesRouter.get(
 
 filesRouter.post(
   '/cleanup-temp',
+  requireAdmin,
   asyncHandler(async (_req, res) => {
     const expiredBefore = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const expiredAttachments = await prisma.attachment.findMany({

@@ -42,16 +42,16 @@ const createCategory = async () => {
   return category;
 };
 
-const createKnowledge = async (authorId: string, categoryId: string) => {
+const createKnowledge = async (authorId: string, categoryId: string, status: KnowledgeStatus = KnowledgeStatus.PUBLISHED) => {
   const knowledge = await prisma.knowledgeItem.create({
     data: {
       title: `File Knowledge ${unique()}`,
       summary: 'File summary',
       content: '# File content',
-      status: KnowledgeStatus.PUBLISHED,
+      status,
       categoryId,
       authorId,
-      publishedAt: new Date(),
+      publishedAt: status === KnowledgeStatus.PUBLISHED ? new Date() : null,
     },
   });
   createdKnowledgeIds.push(knowledge.id);
@@ -233,6 +233,38 @@ describe('file upload routes', () => {
     await request(app).get(`/api/files/${fileId}/download`).set('Authorization', authHeaderFor(otherUser)).expect(404);
   });
 
+  it('keeps draft-bound attachments visible only to the author and admins', async () => {
+    const author = await createUser(UserRole.USER);
+    const otherUser = await createUser(UserRole.USER);
+    const admin = await createUser(UserRole.ADMIN);
+    const category = await createCategory();
+    const uploadResponse = await request(app)
+      .post('/api/files/attachments')
+      .set('Authorization', authHeaderFor(author))
+      .attach('file', Buffer.from('draft secret'), { filename: 'draft-secret.md', contentType: 'text/markdown' })
+      .expect(201);
+    const fileId = uploadResponse.body.data.file.id;
+    createdAttachmentIds.push(fileId);
+
+    const draft = await createKnowledge(author.id, category.id, KnowledgeStatus.DRAFT);
+    await prisma.attachment.update({
+      where: { id: fileId },
+      data: { knowledgeId: draft.id, status: AttachmentStatus.BOUND, boundAt: new Date() },
+    });
+
+    await request(app).get(`/api/files/${fileId}/download`).set('Authorization', authHeaderFor(otherUser)).expect(404);
+    await request(app).get(`/api/files/${fileId}/download`).set('Authorization', authHeaderFor(author)).expect(200);
+    await request(app).get(`/api/files/${fileId}/download`).set('Authorization', authHeaderFor(admin)).expect(200);
+  });
+
+  it('allows only admins to trigger temporary file cleanup', async () => {
+    const user = await createUser(UserRole.USER);
+    const admin = await createUser(UserRole.ADMIN);
+
+    await request(app).post('/api/files/cleanup-temp').set('Authorization', authHeaderFor(user)).expect(403);
+    await request(app).post('/api/files/cleanup-temp').set('Authorization', authHeaderFor(admin)).expect(200);
+  });
+
   it('allows an admin to update another user knowledge without dropping existing bound attachments', async () => {
     const author = await createUser(UserRole.USER);
     const admin = await createUser(UserRole.ADMIN);
@@ -282,7 +314,7 @@ describe('file upload routes', () => {
   });
 
   it('cleans temporary files older than 24 hours', async () => {
-    const user = await createUser();
+    const user = await createUser(UserRole.ADMIN);
     const auth = authHeaderFor(user);
     const uploadResponse = await request(app)
       .post('/api/files/attachments')
