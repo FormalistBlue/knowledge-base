@@ -24,6 +24,7 @@ import { computed, h, onMounted, reactive, ref } from 'vue';
 import { taxonomyApi } from '@/api/taxonomy';
 import CategoryTree from '@/components/CategoryTree.vue';
 import TagSelect from '@/components/TagSelect.vue';
+import { buildCategoryOptions, flattenCategoryTree, getRootCategories, type FlatCategory } from './admin-taxonomy-utils';
 import type { CategoryNode, TagItem } from '@/types/taxonomy';
 
 const message = useMessage();
@@ -46,21 +47,11 @@ const tagForm = reactive({
   name: '',
 });
 
-const flattenCategories = (items: CategoryNode[], depth = 0): Array<CategoryNode & { depth: number }> => {
-  return items.flatMap((item) => [{ ...item, depth }, ...flattenCategories(item.children, depth + 1)]);
-};
-
-const flatCategories = computed(() => flattenCategories(categories.value));
+const flatCategories = computed(() => flattenCategoryTree(getRootCategories(categories.value)));
 const selectedTags = computed(() => tags.value.filter((tag) => selectedTagIds.value.includes(tag.id)));
-const categoryOptions = computed<SelectOption[]>(() => [
-  { label: '无父级', value: '' },
-  ...flatCategories.value.map((category) => ({
-    label: `${'—'.repeat(category.depth)} ${category.name}`,
-    value: category.id,
-  })),
-]);
+const categoryOptions = computed<SelectOption[]>(() => buildCategoryOptions(flatCategories.value, categoryEditingId.value));
 
-const categoryColumns: DataTableColumns<CategoryNode & { depth: number }> = [
+const categoryColumns: DataTableColumns<FlatCategory> = [
   {
     title: '分类名称',
     key: 'name',
