@@ -7,7 +7,6 @@ import {
   NLayoutContent,
   NLayoutHeader,
   NSpace,
-  NText,
   useMessage,
 } from 'naive-ui';
 import { useRouter } from 'vue-router';
@@ -30,29 +29,29 @@ const handleLogout = async () => {
 <template>
   <NLayout class="app-shell">
     <NLayoutHeader bordered class="app-header">
-      <NSpace align="center" justify="space-between">
+      <NSpace align="center" justify="space-between" class="app-topbar">
         <div class="brand" @click="router.push({ name: 'home' })">
           <span class="brand-mark">KB</span>
           <div>
-            <NText strong>knowledge-base</NText>
+            <div class="brand-title">knowledge-base</div>
             <div class="brand-subtitle">部门内部知识库</div>
           </div>
         </div>
-        <NSpace align="center">
-          <NButton quaternary @click="router.push({ name: 'knowledge-list' })">知识库</NButton>
-          <NButton quaternary @click="router.push({ name: 'my-favorites' })">我的收藏</NButton>
-          <NButton quaternary @click="router.push({ name: 'notifications' })">通知</NButton>
-          <NButton type="primary" secondary @click="router.push({ name: 'knowledge-create' })">创建知识</NButton>
-          <NButton v-if="authStore.isAdmin" secondary @click="router.push({ name: 'admin-users' })">
+        <NSpace align="center" class="app-nav">
+          <NButton quaternary round @click="router.push({ name: 'knowledge-list' })">知识库</NButton>
+          <NButton quaternary round @click="router.push({ name: 'my-favorites' })">我的收藏</NButton>
+          <NButton quaternary round @click="router.push({ name: 'notifications' })">通知</NButton>
+          <NButton type="primary" round @click="router.push({ name: 'knowledge-create' })">创建知识</NButton>
+          <NButton v-if="authStore.isAdmin" secondary round @click="router.push({ name: 'admin-users' })">
             后台管理
           </NButton>
-          <NText depth="3">{{ authStore.currentUser?.displayName }}</NText>
+          <span class="app-user-pill">{{ authStore.currentUser?.displayName }}</span>
           <NButton secondary circle @click="themeStore.toggleTheme">
             <template #icon>
               <NIcon :component="themeStore.isDark ? SunnyOutline : MoonOutline" />
             </template>
           </NButton>
-          <NButton quaternary @click="handleLogout">退出</NButton>
+          <NButton quaternary round @click="handleLogout">退出</NButton>
         </NSpace>
       </NSpace>
     </NLayoutHeader>

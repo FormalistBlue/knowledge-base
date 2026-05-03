@@ -53,7 +53,7 @@ onMounted(loadHome);
 
     <NSpin :show="loading">
       <NSpace vertical size="large">
-        <NGrid :cols="3" :x-gap="16" responsive="screen">
+        <NGrid :cols="3" :x-gap="16" responsive="screen" class="home-metrics">
           <NGi>
             <NCard>
               <NStatistic label="登录用户" :value="authStore.currentUser?.username ?? '-'" />
@@ -71,7 +71,7 @@ onMounted(loadHome);
           </NGi>
         </NGrid>
 
-        <NCard>
+        <NCard class="home-panel">
           <div class="home-section-header">
             <div>
               <NTag type="warning" round>置顶知识</NTag>

@@ -9,7 +9,6 @@ import {
   NLayoutSider,
   NMenu,
   NSpace,
-  NText,
   useMessage,
 } from 'naive-ui';
 import { computed } from 'vue';
@@ -70,7 +69,7 @@ const handleLogout = async () => {
       <div class="admin-brand" @click="router.push({ name: 'home' })">
         <span class="brand-mark">KB</span>
         <div>
-          <NText strong>管理后台</NText>
+          <div class="brand-title">管理后台</div>
           <div class="brand-subtitle">knowledge-base</div>
         </div>
       </div>
@@ -79,17 +78,17 @@ const handleLogout = async () => {
 
     <NLayout class="app-main">
       <NLayoutHeader bordered class="app-header">
-        <NSpace align="center" justify="space-between">
-          <NText strong>后台管理</NText>
-          <NSpace align="center">
-            <NButton secondary @click="router.push({ name: 'home' })">返回首页</NButton>
-            <NText depth="3">{{ authStore.currentUser?.displayName }}</NText>
+        <NSpace align="center" justify="space-between" class="app-topbar">
+          <div class="admin-header-title">后台管理</div>
+          <NSpace align="center" class="app-nav">
+            <NButton secondary round @click="router.push({ name: 'home' })">返回首页</NButton>
+            <span class="app-user-pill">{{ authStore.currentUser?.displayName }}</span>
             <NButton secondary circle @click="themeStore.toggleTheme">
               <template #icon>
                 <NIcon :component="themeStore.isDark ? SunnyOutline : MoonOutline" />
               </template>
             </NButton>
-            <NButton quaternary @click="handleLogout">退出</NButton>
+            <NButton quaternary round @click="handleLogout">退出</NButton>
           </NSpace>
         </NSpace>
       </NLayoutHeader>
