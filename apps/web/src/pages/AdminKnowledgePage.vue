@@ -4,8 +4,9 @@ import { h, onMounted, reactive, ref } from 'vue';
 
 import { knowledgeApi } from '@/api/knowledge';
 import { taxonomyApi } from '@/api/taxonomy';
-import type { KnowledgeStatus, KnowledgeSummary } from '@/types/knowledge';
+import type { KnowledgeSummary } from '@/types/knowledge';
 import type { CategoryNode, TagItem } from '@/types/taxonomy';
+import { getStatusFilterParam, statusOptions, type StatusFilterValue } from './admin-knowledge-filters';
 
 const message = useMessage();
 const loading = ref(false);
@@ -15,18 +16,12 @@ const categories = ref<CategoryNode[]>([]);
 const tags = ref<TagItem[]>([]);
 const selectedCategory = reactive<Record<string, string>>({});
 const selectedTags = reactive<Record<string, string[]>>({});
-const query = reactive({ page: 1, pageSize: 10, keyword: '', status: null as KnowledgeStatus | null });
+const query = reactive({ page: 1, pageSize: 10, keyword: '', status: 'ALL' as StatusFilterValue });
 
 const flattenCategories = (nodes: CategoryNode[], depth = 0): SelectOption[] =>
   nodes.flatMap((node) => [{ label: `${'  '.repeat(depth)}${node.name}`, value: node.id }, ...flattenCategories(node.children, depth + 1)]);
 const categoryOptions = ref<SelectOption[]>([]);
 const tagOptions = ref<SelectOption[]>([]);
-const statusOptions = [
-  { label: '全部状态', value: '' },
-  { label: '草稿', value: 'DRAFT' },
-  { label: '已发布', value: 'PUBLISHED' },
-  { label: '已归档', value: 'ARCHIVED' },
-];
 
 const loadFilters = async () => {
   const [categoryResult, tagResult] = await Promise.all([taxonomyApi.getCategories(), taxonomyApi.getTags()]);
@@ -43,7 +38,7 @@ const loadKnowledge = async () => {
       page: query.page,
       pageSize: query.pageSize,
       keyword: query.keyword || undefined,
-      status: query.status ?? undefined,
+      status: getStatusFilterParam(query.status),
       sortBy: 'updatedAt',
       sortOrder: 'desc',
     });

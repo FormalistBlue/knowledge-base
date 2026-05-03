@@ -9,7 +9,7 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
   JWT_EXPIRES_IN: z.string().min(1).default('20d'),
   UPLOAD_DIR: z.string().min(1).default('uploads'),
-  MAX_UPLOAD_SIZE_MB: z.coerce.number().positive().max(100).default(50),
+  MAX_UPLOAD_SIZE_MB: z.coerce.number().positive().max(50).default(50),
   CORS_ORIGIN: z.string().optional(),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });

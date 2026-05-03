@@ -95,6 +95,26 @@ describe('auth routes', () => {
     expect(response.body.code).toBe('USER_DISABLED');
   });
 
+  it('rate limits repeated failed login attempts by username and IP', async () => {
+    const user = await createUser({ password: 'Password123!' });
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      await request(app)
+        .post('/api/auth/login')
+        .set('X-Forwarded-For', '198.51.100.10')
+        .send({ username: user.username, password: 'WrongPassword123!' })
+        .expect(401);
+    }
+
+    const limitedResponse = await request(app)
+      .post('/api/auth/login')
+      .set('X-Forwarded-For', '198.51.100.10')
+      .send({ username: user.username, password: 'WrongPassword123!' })
+      .expect(429);
+
+    expect(limitedResponse.body.code).toBe('TOO_MANY_LOGIN_ATTEMPTS');
+  });
+
   it('invalidates old tokens after changing password', async () => {
     const user = await createUser({ password: 'OldPassword123!' });
     const oldToken = signToken({ sub: user.id, role: user.role, tokenVersion: user.tokenVersion });

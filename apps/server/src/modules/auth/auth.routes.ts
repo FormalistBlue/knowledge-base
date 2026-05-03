@@ -8,6 +8,7 @@ import { asyncHandler } from '../../utils/async-handler.js';
 import { prisma } from '../../utils/prisma.js';
 import { sendSuccess } from '../../utils/response.js';
 import { signToken } from './jwt.js';
+import { loginRateLimiter } from './login-rate-limit.js';
 import { hashPassword, verifyPassword } from './password.js';
 import { toSafeUser } from './user-presenter.js';
 
@@ -25,6 +26,7 @@ const changePasswordSchema = z.object({
 
 authRouter.post(
   '/login',
+  loginRateLimiter,
   validate({ body: loginSchema }),
   asyncHandler(async (req, res) => {
     const { username, password } = req.body as z.infer<typeof loginSchema>;

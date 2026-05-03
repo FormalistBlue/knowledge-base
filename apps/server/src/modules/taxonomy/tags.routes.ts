@@ -85,10 +85,10 @@ adminTagsRouter.put(
     }
 
     const duplicate = await prisma.tag.findFirst({
-      where: { id: { not: id }, normalizedName, deletedAt: null },
+      where: { id: { not: id }, normalizedName },
     });
     if (duplicate) {
-      throw new AppError('CONFLICT', '标签名称已存在', 409);
+      throw new AppError('CONFLICT', duplicate.deletedAt ? '标签名称与已删除标签冲突，请重新创建或使用其他名称' : '标签名称已存在', 409);
     }
 
     const updatedTag = await prisma.tag.update({

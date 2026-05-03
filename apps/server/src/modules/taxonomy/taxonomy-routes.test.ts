@@ -232,6 +232,23 @@ describe('tag routes', () => {
     expect(auditLogs.some((log) => log.action === AuditAction.DELETE_TAG)).toBe(true);
   });
 
+  it('returns a business conflict instead of a database error when updating to a soft-deleted tag name', async () => {
+    const admin = await createUser(UserRole.ADMIN);
+    const adminAuth = authHeaderFor(admin);
+    const activeTag = await createTag(`active-${unique().replace(/[^a-z0-9]/gi, '').slice(0, 12)}`, admin.id);
+    const deletedTag = await createTag(`deleted-${unique().replace(/[^a-z0-9]/gi, '').slice(0, 12)}`, admin.id);
+
+    await prisma.tag.update({ where: { id: deletedTag.id }, data: { deletedAt: new Date() } });
+
+    const response = await request(app)
+      .put(`/api/admin/tags/${activeTag.id}`)
+      .set('Authorization', adminAuth)
+      .send({ name: deletedTag.name })
+      .expect(409);
+
+    expect(response.body.code).toBe('CONFLICT');
+  });
+
   it('rejects non-admin users from tag maintenance', async () => {
     const user = await createUser(UserRole.USER);
     const tag = await createTag(`tag-${unique()}`, user.id);

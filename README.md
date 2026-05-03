@@ -124,7 +124,7 @@ ADMIN_DISPLAY_NAME=管理员
 
 - `DATABASE_URL` 在 Docker Compose 中由 compose 自动按 `postgres` 服务名生成，通常不用手动改。
 - `UPLOAD_DIR` 在容器内固定为 `/app/data/uploads`，并挂载到 `uploads_data` volume。
-- `MAX_UPLOAD_SIZE_MB` 默认 50，Nginx `client_max_body_size` 也配置为 50m。
+- `MAX_UPLOAD_SIZE_MB` 默认 50，服务端配置上限也是 50，Nginx `client_max_body_size` 也配置为 50m，避免生产环境前后限制不一致。
 - `CORS_ORIGIN` 生产环境建议填写最终访问地址；Docker 同源部署下通常填写前端域名或 `http://服务器地址:8080`。
 
 ### 2. 构建并启动服务
@@ -219,9 +219,13 @@ sudo docker compose exec server npm --prefix apps/server run seed:prod
 
 ## 验证命令
 
+服务端测试依赖 PostgreSQL 测试库和环境变量；如果本机没有现成数据库，可先用 Compose 启动项目自带 PostgreSQL，再用 `.env` 中一致的 `POSTGRES_*` 值拼出 `DATABASE_URL`。
+
 ```bash
-DATABASE_URL=postgresql://kb_user:<DB_PASSWORD>@localhost:5432/knowledge_base JWT_SECRET=<JWT_SECRET_AT_LEAST_32_CHARS> pnpm --filter server test
-DATABASE_URL=postgresql://kb_user:<DB_PASSWORD>@localhost:5432/knowledge_base JWT_SECRET=<JWT_SECRET_AT_LEAST_32_CHARS> pnpm --filter server typecheck
+sudo docker compose up -d postgres
+DATABASE_URL=postgresql://<POSTGRES_USER>:<POSTGRES_PASSWORD>@localhost:5432/<POSTGRES_DB> JWT_SECRET=<JWT_SECRET_AT_LEAST_32_CHARS> pnpm --filter server db:deploy
+DATABASE_URL=postgresql://<POSTGRES_USER>:<POSTGRES_PASSWORD>@localhost:5432/<POSTGRES_DB> JWT_SECRET=<JWT_SECRET_AT_LEAST_32_CHARS> pnpm --filter server test
+DATABASE_URL=postgresql://<POSTGRES_USER>:<POSTGRES_PASSWORD>@localhost:5432/<POSTGRES_DB> JWT_SECRET=<JWT_SECRET_AT_LEAST_32_CHARS> pnpm --filter server typecheck
 pnpm --filter server build
 pnpm --filter web test
 pnpm --filter web build

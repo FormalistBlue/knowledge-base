@@ -16,7 +16,7 @@ import {
   NThing,
   useMessage,
 } from 'naive-ui';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { commentsApi } from '@/api/interactions';
@@ -26,6 +26,7 @@ import type { CommentItem } from '@/types/interactions';
 import type { KnowledgeDetail } from '@/types/knowledge';
 import { downloadFile, previewFile } from '@/utils/file-actions';
 import { renderMarkdown } from '@/utils/markdown';
+import { loadProtectedImageUrls, replaceProtectedImageUrls, revokeProtectedImageUrls } from '@/utils/markdown-images';
 
 const route = useRoute();
 const router = useRouter();
@@ -36,6 +37,7 @@ const knowledge = ref<KnowledgeDetail | null>(null);
 const comments = ref<CommentItem[]>([]);
 const commentContent = ref('');
 const replyInputs = ref<Record<string, string>>({});
+const markdownImageUrls = ref<Record<string, string>>({});
 
 const knowledgeId = computed(() => String(route.params.id));
 const canManage = computed(() => {
@@ -43,6 +45,10 @@ const canManage = computed(() => {
   return authStore.isAdmin || knowledge.value.author.id === authStore.currentUser.id;
 });
 const attachmentFiles = computed(() => knowledge.value?.attachments.filter((file) => file.usageType === 'ATTACHMENT') ?? []);
+const renderedKnowledgeContent = computed(() => {
+  if (!knowledge.value) return '';
+  return renderMarkdown(replaceProtectedImageUrls(knowledge.value.content, markdownImageUrls.value));
+});
 
 const formatFileSize = (size: number) => {
   if (size < 1024) return `${size} B`;
@@ -53,8 +59,18 @@ const formatFileSize = (size: number) => {
 const loadDetail = async () => {
   loading.value = true;
   try {
-    knowledge.value = await knowledgeApi.detail(knowledgeId.value);
-    comments.value = await commentsApi.list(knowledgeId.value);
+    revokeProtectedImageUrls(markdownImageUrls.value);
+    markdownImageUrls.value = {};
+    knowledge.value = null;
+    comments.value = [];
+    const nextKnowledge = await knowledgeApi.detail(knowledgeId.value);
+    const [nextComments, nextImageUrls] = await Promise.all([
+      commentsApi.list(knowledgeId.value),
+      loadProtectedImageUrls(nextKnowledge.attachments),
+    ]);
+    knowledge.value = nextKnowledge;
+    comments.value = nextComments;
+    markdownImageUrls.value = nextImageUrls;
   } catch (error) {
     message.error(error instanceof Error ? error.message : '知识详情加载失败');
   } finally {
@@ -112,6 +128,9 @@ const canDeleteComment = (comment: CommentItem) => {
 };
 
 onMounted(loadDetail);
+onBeforeUnmount(() => {
+  revokeProtectedImageUrls(markdownImageUrls.value);
+});
 </script>
 
 <template>
@@ -154,7 +173,7 @@ onMounted(loadDetail);
         <NSpace class="knowledge-tags" size="small">
           <NTag v-for="tag in knowledge.tags" :key="tag.id" size="small" type="info">{{ tag.name }}</NTag>
         </NSpace>
-        <article class="markdown-preview" v-html="renderMarkdown(knowledge.content)"></article>
+        <article class="markdown-preview" v-html="renderedKnowledgeContent"></article>
       </NCard>
 
       <NCard v-if="attachmentFiles.length" title="附件下载">
