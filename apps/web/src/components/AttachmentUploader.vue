@@ -5,6 +5,7 @@ import { computed, ref } from 'vue';
 import { filesApi } from '@/api/files';
 import type { UploadedFile } from '@/types/files';
 import { downloadFile, previewFile } from '@/utils/file-actions';
+import { getFileDescription } from '@/utils/file-display';
 
 const props = defineProps<{
   files: UploadedFile[];
@@ -19,12 +20,6 @@ const uploading = ref(false);
 const uploadPercent = ref(0);
 
 const attachmentFiles = computed(() => props.files.filter((file) => file.usageType === 'ATTACHMENT'));
-
-const formatFileSize = (size: number) => {
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  return `${(size / 1024 / 1024).toFixed(1)} MB`;
-};
 
 const handleUpload = async ({ file, onFinish, onError }: UploadCustomRequestOptions) => {
   const rawFile = file.file;
@@ -68,7 +63,7 @@ const removeFile = (fileId: string) => {
 
       <NList v-if="attachmentFiles.length" bordered>
         <NListItem v-for="file in attachmentFiles" :key="file.id">
-          <NThing :title="file.originalName" :description="`${formatFileSize(file.fileSize)} · ${file.extension.toUpperCase()}`">
+          <NThing :title="file.originalName" :description="getFileDescription(file)">
             <template #header-extra>
               <NSpace>
                 <NButton v-if="['pdf'].includes(file.extension)" text @click="previewFile(file)">预览</NButton>

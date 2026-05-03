@@ -25,6 +25,7 @@ import { useAuthStore } from '@/stores/auth';
 import type { CommentItem } from '@/types/interactions';
 import type { KnowledgeDetail } from '@/types/knowledge';
 import { downloadFile, previewFile } from '@/utils/file-actions';
+import { getFileDescription } from '@/utils/file-display';
 import { renderMarkdown } from '@/utils/markdown';
 import { loadProtectedImageUrls, replaceProtectedImageUrls, revokeProtectedImageUrls } from '@/utils/markdown-images';
 
@@ -49,12 +50,6 @@ const renderedKnowledgeContent = computed(() => {
   if (!knowledge.value) return '';
   return renderMarkdown(replaceProtectedImageUrls(knowledge.value.content, markdownImageUrls.value));
 });
-
-const formatFileSize = (size: number) => {
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  return `${(size / 1024 / 1024).toFixed(1)} MB`;
-};
 
 const loadDetail = async () => {
   loading.value = true;
@@ -179,7 +174,7 @@ onBeforeUnmount(() => {
       <NCard v-if="attachmentFiles.length" title="附件下载">
         <NList bordered>
           <NListItem v-for="file in attachmentFiles" :key="file.id">
-            <NThing :title="file.originalName" :description="`${formatFileSize(file.fileSize)} · ${file.extension.toUpperCase()}`">
+            <NThing :title="file.originalName" :description="getFileDescription(file)">
               <template #header-extra>
                 <NSpace>
                   <NButton v-if="file.extension === 'pdf'" text @click="previewFile(file)">预览</NButton>

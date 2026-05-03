@@ -1,21 +1,23 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
-import AdminLayout from '@/layouts/AdminLayout.vue';
-import MainLayout from '@/layouts/MainLayout.vue';
-import AdminAuditLogsPage from '@/pages/AdminAuditLogsPage.vue';
-import AdminCommentsPage from '@/pages/AdminCommentsPage.vue';
-import AdminDashboardPage from '@/pages/AdminDashboardPage.vue';
-import AdminKnowledgePage from '@/pages/AdminKnowledgePage.vue';
-import AdminTaxonomyPage from '@/pages/AdminTaxonomyPage.vue';
-import AdminUsersPage from '@/pages/AdminUsersPage.vue';
-import HomePage from '@/pages/HomePage.vue';
-import KnowledgeDetailPage from '@/pages/KnowledgeDetailPage.vue';
-import KnowledgeEditorPage from '@/pages/KnowledgeEditorPage.vue';
-import KnowledgeListPage from '@/pages/KnowledgeListPage.vue';
-import LoginPage from '@/pages/LoginPage.vue';
-import MyFavoritesPage from '@/pages/MyFavoritesPage.vue';
-import UnauthorizedPage from '@/pages/UnauthorizedPage.vue';
 import { useAuthStore } from '@/stores/auth';
+
+const AdminLayout = () => import('@/layouts/AdminLayout.vue');
+const MainLayout = () => import('@/layouts/MainLayout.vue');
+const AdminAuditLogsPage = () => import('@/pages/AdminAuditLogsPage.vue');
+const AdminCommentsPage = () => import('@/pages/AdminCommentsPage.vue');
+const AdminDashboardPage = () => import('@/pages/AdminDashboardPage.vue');
+const AdminKnowledgePage = () => import('@/pages/AdminKnowledgePage.vue');
+const AdminTaxonomyPage = () => import('@/pages/AdminTaxonomyPage.vue');
+const AdminUsersPage = () => import('@/pages/AdminUsersPage.vue');
+const HomePage = () => import('@/pages/HomePage.vue');
+const KnowledgeDetailPage = () => import('@/pages/KnowledgeDetailPage.vue');
+const KnowledgeEditorPage = () => import('@/pages/KnowledgeEditorPage.vue');
+const KnowledgeListPage = () => import('@/pages/KnowledgeListPage.vue');
+const LoginPage = () => import('@/pages/LoginPage.vue');
+const MyFavoritesPage = () => import('@/pages/MyFavoritesPage.vue');
+const NotificationsPage = () => import('@/pages/NotificationsPage.vue');
+const UnauthorizedPage = () => import('@/pages/UnauthorizedPage.vue');
 
 const router = createRouter({
   history: createWebHistory(),
@@ -58,7 +60,7 @@ const router = createRouter({
         {
           path: 'notifications',
           name: 'notifications',
-          component: () => import('@/pages/NotificationsPage.vue'),
+          component: NotificationsPage,
           meta: { requiresAuth: true },
         },
         {

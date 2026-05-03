@@ -408,11 +408,27 @@ describe('knowledge CRUD routes', () => {
         status: KnowledgeStatus.DRAFT,
         categoryId: category.id,
         tagIds: [tag.id],
+        attachmentIds: [],
       })
       .expect(201);
 
     const knowledge = createResponse.body.data.knowledge;
     createdKnowledgeIds.push(knowledge.id);
+    await prisma.attachment.create({
+      data: {
+        knowledgeId: knowledge.id,
+        uploaderId: author.id,
+        usageType: 'ATTACHMENT',
+        status: 'BOUND',
+        originalName: 'guide.pdf',
+        storedName: 'guide.pdf',
+        relativePath: '2026/05/guide.pdf',
+        fileSize: 1024,
+        mimeType: 'application/pdf',
+        extension: 'pdf',
+        boundAt: new Date(),
+      },
+    });
     expect(knowledge).toMatchObject({
       title: 'Vue Component Guide',
       status: KnowledgeStatus.DRAFT,
@@ -423,7 +439,19 @@ describe('knowledge CRUD routes', () => {
     expect(knowledge.publishedAt).toBeNull();
 
     const detailResponse = await request(app).get(`/api/knowledge/${knowledge.id}`).set('Authorization', auth).expect(200);
-    expect(detailResponse.body.data.knowledge).toMatchObject({ id: knowledge.id, content: '# Vue Component Guide' });
+    expect(detailResponse.body.data.knowledge).toMatchObject({
+      id: knowledge.id,
+      content: '# Vue Component Guide',
+      attachments: [
+        expect.objectContaining({
+          originalName: 'guide.pdf',
+          extension: 'pdf',
+          url: expect.stringContaining('/api/files/'),
+          previewUrl: expect.stringContaining('/api/files/'),
+          downloadUrl: expect.stringContaining('/api/files/'),
+        }),
+      ],
+    });
 
     const mineResponse = await request(app)
       .get('/api/knowledge')

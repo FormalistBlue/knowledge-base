@@ -20,6 +20,7 @@ import { computed, h, onMounted, reactive, ref } from 'vue';
 
 import { authApi } from '@/api/auth';
 import type { CreateUserPayload, CurrentUser, UserRole, UserStatus } from '@/types/auth';
+import { getErrorMessage } from '@/utils/error-message';
 
 const message = useMessage();
 const loading = ref(false);
@@ -79,13 +80,21 @@ const createUser = async () => {
     message.warning('请填写用户名、显示名和至少 8 位密码');
     return;
   }
-  await authApi.createUser({ ...createForm });
-  message.success('用户已创建');
-  createForm.username = '';
-  createForm.displayName = '';
-  createForm.password = '';
-  createForm.role = 'USER';
-  await loadUsers();
+
+  loading.value = true;
+  try {
+    await authApi.createUser({ ...createForm });
+    message.success('用户已创建');
+    createForm.username = '';
+    createForm.displayName = '';
+    createForm.password = '';
+    createForm.role = 'USER';
+    await loadUsers();
+  } catch (error) {
+    message.error(getErrorMessage(error, '创建用户失败'));
+  } finally {
+    loading.value = false;
+  }
 };
 
 const toggleStatus = async (user: CurrentUser) => {

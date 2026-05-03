@@ -13,7 +13,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <NConfigProvider :theme="naiveTheme">
+  <NConfigProvider class="app-theme-provider" :theme="naiveTheme">
     <NMessageProvider>
       <RouterView />
     </NMessageProvider>

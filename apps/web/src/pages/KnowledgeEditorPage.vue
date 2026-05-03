@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router';
 
 import { knowledgeApi } from '@/api/knowledge';
 import { taxonomyApi } from '@/api/taxonomy';
+import { getErrorMessage } from '@/utils/error-message';
 import AttachmentUploader from '@/components/AttachmentUploader.vue';
 import ImageUploader from '@/components/ImageUploader.vue';
 import TagSelect from '@/components/TagSelect.vue';
@@ -65,7 +66,7 @@ const init = async () => {
     await loadOptions();
     await loadKnowledge();
   } catch (error) {
-    message.error(error instanceof Error ? error.message : '编辑器初始化失败');
+    message.error(getErrorMessage(error, '编辑器初始化失败'));
   } finally {
     loading.value = false;
   }
@@ -84,7 +85,7 @@ const submit = async (status: KnowledgePayload['status']) => {
     message.success(status === 'PUBLISHED' ? '知识已发布' : '草稿已保存');
     await router.push({ name: 'knowledge-detail', params: { id: saved.id } });
   } catch (error) {
-    message.error(error instanceof Error ? error.message : '保存失败');
+    message.error(getErrorMessage(error, '保存失败'));
   } finally {
     loading.value = false;
   }

@@ -50,6 +50,8 @@ export const toKnowledgeDetail = (knowledge: KnowledgeWithRelations, currentUser
     mimeType: attachment.mimeType,
     usageType: attachment.usageType,
     status: attachment.status,
+    extension: attachment.extension,
+    url: `/api/files/${attachment.id}/preview`,
     previewUrl: `/api/files/${attachment.id}/preview`,
     downloadUrl: `/api/files/${attachment.id}/download`,
   })),

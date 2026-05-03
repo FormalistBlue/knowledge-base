@@ -13,22 +13,41 @@
   box-sizing: border-box;
 }
 
+html,
+body,
+#app {
+  height: 100%;
+}
+
 body {
   margin: 0;
   min-width: 1024px;
   min-height: 100vh;
+  overflow: hidden;
 }
 
 .app-shell {
+  height: 100vh;
   min-height: 100vh;
 }
 
+.app-main {
+  height: 100%;
+}
+
+.app-main.has-header {
+  height: calc(100vh - 73px);
+}
+
 .app-header {
+  height: 73px;
   padding: 16px 28px;
 }
 
 .app-content {
+  height: 100%;
   padding: 32px;
+  overflow-y: auto;
 }
 
 .brand,
@@ -44,7 +63,9 @@ body {
 }
 
 .admin-sider {
+  height: 100vh;
   min-height: 100vh;
+  overflow: hidden;
 }
 
 .brand-mark {
@@ -209,6 +230,15 @@ body {
   border: 1px solid rgba(47, 93, 80, 0.14);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.48);
+}
+
+.app-theme-provider .n-input,
+.app-theme-provider .n-input .n-input-wrapper,
+.app-theme-provider .n-input .n-input__input-el,
+.app-theme-provider .n-input .n-input__textarea-el,
+.app-theme-provider .n-base-selection,
+.app-theme-provider .n-base-selection .n-base-selection-label {
+  background-color: rgba(36, 42, 39, 0.92);
 }
 
 .image-card__actions {

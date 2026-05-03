@@ -77,7 +77,7 @@ const handleLogout = async () => {
       <NMenu :value="activeMenuKey" :options="menuOptions" @update:value="handleMenuUpdate" />
     </NLayoutSider>
 
-    <NLayout>
+    <NLayout class="app-main">
       <NLayoutHeader bordered class="app-header">
         <NSpace align="center" justify="space-between">
           <NText strong>后台管理</NText>
