@@ -9,6 +9,7 @@ describe('admin knowledge filters', () => {
 
   it('omits status when all statuses are selected', () => {
     expect(getStatusFilterParam('ALL')).toBeUndefined();
+    expect(getStatusFilterParam(null)).toBeUndefined();
     expect(getStatusFilterParam('PUBLISHED')).toBe('PUBLISHED');
   });
 });

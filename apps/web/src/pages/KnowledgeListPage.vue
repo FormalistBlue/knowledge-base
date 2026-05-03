@@ -170,7 +170,7 @@ watch(
         <NSpin :show="filterLoading">
           <NSpace vertical size="medium">
             <NSpace align="center" wrap>
-              <NInput v-model:value="query.keyword" clearable placeholder="搜索标题、摘要、正文或标签" @keyup.enter="handleSearch" />
+              <NInput v-model:value="query.keyword" clearable placeholder="搜索标题、摘要、正文或标签" class="filter-keyword" @keyup.enter="handleSearch" />
               <NSelect v-model:value="query.categoryId" clearable filterable :options="categoryOptions" placeholder="选择分类" class="filter-control" />
               <NSpace align="center" size="small">
                 <NText depth="3">包含子分类</NText>
@@ -188,7 +188,7 @@ watch(
                 placeholder="选择标签"
                 class="filter-wide"
               />
-              <NDatePicker v-model:value="query.publishedRange" type="daterange" clearable class="filter-control" />
+              <NDatePicker v-model:value="query.publishedRange" type="daterange" clearable class="filter-date-range" />
               <NSelect v-model:value="selectedSort" :options="sortOptions" class="filter-control" />
               <NButton type="primary" @click="handleSearch">搜索</NButton>
               <NButton secondary @click="resetFilters">重置</NButton>

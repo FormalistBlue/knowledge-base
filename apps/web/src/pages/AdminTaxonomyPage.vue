@@ -10,6 +10,7 @@ import {
   NH2,
   NInput,
   NInputNumber,
+  NModal,
   NPopconfirm,
   NP,
   NSelect,
@@ -19,7 +20,7 @@ import {
   type DataTableColumns,
   type SelectOption,
 } from 'naive-ui';
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, h, onMounted, reactive, ref } from 'vue';
 
 import { taxonomyApi } from '@/api/taxonomy';
 import CategoryTree from '@/components/CategoryTree.vue';
@@ -33,6 +34,8 @@ const tags = ref<TagItem[]>([]);
 const selectedTagIds = ref<string[]>([]);
 const categoryEditingId = ref<string | null>(null);
 const tagEditingId = ref<string | null>(null);
+const categoryModalVisible = ref(false);
+const tagModalVisible = ref(false);
 
 const categoryForm = reactive({
   name: '',
@@ -70,9 +73,9 @@ const categoryColumns: DataTableColumns<CategoryNode & { depth: number }> = [
   {
     title: '操作',
     key: 'actions',
-    width: 130,
+    width: 150,
     render(row) {
-      return h(NSpace, () => [
+      return h(NSpace, { align: 'center', size: 'small', wrap: false }, () => [
         h(NButton, { size: 'small', secondary: true, onClick: () => editCategory(row) }, { default: () => '编辑' }),
         hDeleteButton('删除', () => deleteCategory(row.id)),
       ]);
@@ -86,9 +89,9 @@ const tagColumns: DataTableColumns<TagItem> = [
   {
     title: '操作',
     key: 'actions',
-    width: 130,
+    width: 150,
     render(row) {
-      return h(NSpace, () => [
+      return h(NSpace, { align: 'center', size: 'small', wrap: false }, () => [
         h(NButton, { size: 'small', secondary: true, onClick: () => editTag(row) }, { default: () => '编辑' }),
         hDeleteButton('删除', () => deleteTag(row.id)),
       ]);
@@ -136,10 +139,8 @@ const saveCategory = async () => {
     await taxonomyApi.createCategory(payload);
     message.success('分类已创建');
   }
-  categoryEditingId.value = null;
-  categoryForm.name = '';
-  categoryForm.parentId = '';
-  categoryForm.sortOrder = 0;
+  categoryModalVisible.value = false;
+  resetCategoryForm();
   await loadTaxonomy();
 };
 
@@ -148,12 +149,25 @@ const editCategory = (category: CategoryNode) => {
   categoryForm.name = category.name;
   categoryForm.parentId = category.parentId ?? '';
   categoryForm.sortOrder = category.sortOrder;
+  categoryModalVisible.value = true;
 };
 
 const deleteCategory = async (id: string) => {
   await taxonomyApi.deleteCategory(id);
   message.success('分类已删除');
   await loadTaxonomy();
+};
+
+const resetCategoryForm = () => {
+  categoryEditingId.value = null;
+  categoryForm.name = '';
+  categoryForm.parentId = '';
+  categoryForm.sortOrder = 0;
+};
+
+const openCreateCategoryModal = () => {
+  resetCategoryForm();
+  categoryModalVisible.value = true;
 };
 
 const saveTag = async () => {
@@ -169,14 +183,15 @@ const saveTag = async () => {
     await taxonomyApi.createTag({ name: tagForm.name });
     message.success('标签已创建');
   }
-  tagEditingId.value = null;
-  tagForm.name = '';
+  tagModalVisible.value = false;
+  resetTagForm();
   await loadTaxonomy();
 };
 
 const editTag = (tag: TagItem) => {
   tagEditingId.value = tag.id;
   tagForm.name = tag.name;
+  tagModalVisible.value = true;
 };
 
 const deleteTag = async (id: string) => {
@@ -186,11 +201,17 @@ const deleteTag = async (id: string) => {
   await loadTaxonomy();
 };
 
-onMounted(loadTaxonomy);
-</script>
+const resetTagForm = () => {
+  tagEditingId.value = null;
+  tagForm.name = '';
+};
 
-<script lang="ts">
-import { h } from 'vue';
+const openCreateTagModal = () => {
+  resetTagForm();
+  tagModalVisible.value = true;
+};
+
+onMounted(loadTaxonomy);
 </script>
 
 <template>
@@ -215,43 +236,53 @@ import { h } from 'vue';
         </NGi>
       </NGrid>
 
-      <NGrid :cols="2" :x-gap="16" :y-gap="16" responsive="screen">
-        <NGi>
-          <NCard title="创建分类">
-            <NForm label-placement="top">
-              <NFormItem label="分类名称">
-                <NInput v-model:value="categoryForm.name" placeholder="例如：研发规范" />
-              </NFormItem>
-              <NFormItem label="父级分类">
-                <NSelect v-model:value="categoryForm.parentId" :options="categoryOptions" />
-              </NFormItem>
-              <NFormItem label="排序值">
-                <NInputNumber v-model:value="categoryForm.sortOrder" :min="0" :max="9999" />
-              </NFormItem>
-              <NButton type="primary" :loading="loading" @click="saveCategory">{{ categoryEditingId ? '保存分类' : '创建分类' }}</NButton>
-            </NForm>
-          </NCard>
-        </NGi>
-
-        <NGi>
-          <NCard title="创建标签">
-            <NForm label-placement="top">
-              <NFormItem label="标签名称">
-                <NInput v-model:value="tagForm.name" placeholder="例如：Vue" />
-              </NFormItem>
-              <NButton type="primary" :loading="loading" @click="saveTag">{{ tagEditingId ? '保存标签' : '创建标签' }}</NButton>
-            </NForm>
-          </NCard>
-        </NGi>
-      </NGrid>
-
       <NCard title="分类列表">
+        <template #header-extra>
+          <NButton type="primary" @click="openCreateCategoryModal">新增分类</NButton>
+        </template>
         <NDataTable :loading="loading" :columns="categoryColumns" :data="flatCategories" :pagination="false" />
       </NCard>
 
       <NCard title="标签列表">
+        <template #header-extra>
+          <NButton type="primary" @click="openCreateTagModal">新增标签</NButton>
+        </template>
         <NDataTable :loading="loading" :columns="tagColumns" :data="tags" :pagination="false" />
       </NCard>
+
+      <NModal v-model:show="categoryModalVisible" preset="card" :title="categoryEditingId ? '编辑分类' : '新增分类'" class="admin-dialog" :bordered="false">
+        <NForm label-placement="top">
+          <NFormItem label="分类名称">
+            <NInput v-model:value="categoryForm.name" placeholder="例如：研发规范" />
+          </NFormItem>
+          <NFormItem label="父级分类">
+            <NSelect v-model:value="categoryForm.parentId" :options="categoryOptions" />
+          </NFormItem>
+          <NFormItem label="排序值">
+            <NInputNumber v-model:value="categoryForm.sortOrder" :min="0" :max="9999" />
+          </NFormItem>
+        </NForm>
+        <template #footer>
+          <NSpace justify="end">
+            <NButton @click="categoryModalVisible = false">取消</NButton>
+            <NButton type="primary" :loading="loading" @click="saveCategory">{{ categoryEditingId ? '保存' : '创建' }}</NButton>
+          </NSpace>
+        </template>
+      </NModal>
+
+      <NModal v-model:show="tagModalVisible" preset="card" :title="tagEditingId ? '编辑标签' : '新增标签'" class="admin-dialog" :bordered="false">
+        <NForm label-placement="top">
+          <NFormItem label="标签名称">
+            <NInput v-model:value="tagForm.name" placeholder="例如：Vue" />
+          </NFormItem>
+        </NForm>
+        <template #footer>
+          <NSpace justify="end">
+            <NButton @click="tagModalVisible = false">取消</NButton>
+            <NButton type="primary" :loading="loading" @click="saveTag">{{ tagEditingId ? '保存' : '创建' }}</NButton>
+          </NSpace>
+        </template>
+      </NModal>
     </NSpace>
   </section>
 </template>

@@ -16,7 +16,7 @@ import {
   NThing,
   useMessage,
 } from 'naive-ui';
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { commentsApi } from '@/api/interactions';
@@ -38,6 +38,7 @@ const knowledge = ref<KnowledgeDetail | null>(null);
 const comments = ref<CommentItem[]>([]);
 const commentContent = ref('');
 const replyInputs = ref<Record<string, string>>({});
+const replyVisible = reactive<Record<string, boolean>>({});
 const markdownImageUrls = ref<Record<string, string>>({});
 
 const knowledgeId = computed(() => String(route.params.id));
@@ -58,6 +59,9 @@ const loadDetail = async () => {
     markdownImageUrls.value = {};
     knowledge.value = null;
     comments.value = [];
+    Object.keys(replyVisible).forEach((id) => {
+      delete replyVisible[id];
+    });
     const nextKnowledge = await knowledgeApi.detail(knowledgeId.value);
     const [nextComments, nextImageUrls] = await Promise.all([
       commentsApi.list(knowledgeId.value),
@@ -108,8 +112,18 @@ const submitReply = async (comment: CommentItem) => {
   if (!content) return;
   await commentsApi.create(knowledgeId.value, { content, parentId: comment.id });
   replyInputs.value[comment.id] = '';
+  replyVisible[comment.id] = false;
   message.success('回复已发布');
   comments.value = await commentsApi.list(knowledgeId.value);
+};
+
+const toggleReply = (comment: CommentItem) => {
+  replyVisible[comment.id] = !replyVisible[comment.id];
+};
+
+const cancelReply = (comment: CommentItem) => {
+  replyInputs.value[comment.id] = '';
+  replyVisible[comment.id] = false;
 };
 
 const deleteComment = async (comment: CommentItem) => {
@@ -158,7 +172,8 @@ onBeforeUnmount(() => {
       </section>
 
       <NCard>
-        <NDescriptions bordered :column="3" size="small">
+        <article class="markdown-preview" v-html="renderedKnowledgeContent"></article>
+        <NDescriptions bordered :column="3" size="small" class="knowledge-detail-meta">
           <NDescriptionsItem label="作者">{{ knowledge.author.displayName }}</NDescriptionsItem>
           <NDescriptionsItem label="分类">{{ knowledge.category.name }}</NDescriptionsItem>
           <NDescriptionsItem label="浏览">{{ knowledge.viewCount }}</NDescriptionsItem>
@@ -168,7 +183,6 @@ onBeforeUnmount(() => {
         <NSpace class="knowledge-tags" size="small">
           <NTag v-for="tag in knowledge.tags" :key="tag.id" size="small" type="info">{{ tag.name }}</NTag>
         </NSpace>
-        <article class="markdown-preview" v-html="renderedKnowledgeContent"></article>
       </NCard>
 
       <NCard v-if="attachmentFiles.length" title="附件下载">
@@ -188,10 +202,10 @@ onBeforeUnmount(() => {
 
       <NCard title="评论区">
         <NSpace vertical size="large">
-          <NSpace align="end">
-            <NInput v-model:value="commentContent" type="textarea" placeholder="写下你的评论" class="comment-input" />
+          <div class="comment-compose">
+            <NInput v-model:value="commentContent" type="textarea" placeholder="写下你的评论" class="comment-input" :autosize="{ minRows: 3, maxRows: 6 }" />
             <NButton type="primary" @click="submitComment">发布评论</NButton>
-          </NSpace>
+          </div>
           <NList bordered>
             <NListItem v-for="comment in comments" :key="comment.id">
               <NSpace vertical size="small">
@@ -199,6 +213,7 @@ onBeforeUnmount(() => {
                 <article class="markdown-preview comment-content" v-html="renderMarkdown(comment.content)"></article>
                 <NSpace align="center">
                   <NText depth="3">{{ new Date(comment.createdAt).toLocaleString() }}</NText>
+                  <NButton text type="primary" @click="toggleReply(comment)">{{ replyVisible[comment.id] ? '收起回复' : '回复' }}</NButton>
                   <NPopconfirm v-if="canDeleteComment(comment)" @positive-click="deleteComment(comment)">
                     <template #trigger><NButton text type="error">删除</NButton></template>
                     确认删除这条评论吗？
@@ -219,10 +234,13 @@ onBeforeUnmount(() => {
                     </NSpace>
                   </NListItem>
                 </NList>
-                <NSpace align="end">
-                  <NInput v-model:value="replyInputs[comment.id]" type="textarea" placeholder="回复这条评论" class="comment-input" />
-                  <NButton secondary @click="submitReply(comment)">回复</NButton>
-                </NSpace>
+                <div v-if="replyVisible[comment.id]" class="comment-compose reply-compose">
+                  <NInput v-model:value="replyInputs[comment.id]" type="textarea" placeholder="回复这条评论" class="comment-input" :autosize="{ minRows: 2, maxRows: 5 }" />
+                  <NSpace>
+                    <NButton secondary @click="cancelReply(comment)">取消</NButton>
+                    <NButton type="primary" secondary @click="submitReply(comment)">回复</NButton>
+                  </NSpace>
+                </div>
               </NSpace>
             </NListItem>
           </NList>

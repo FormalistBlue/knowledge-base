@@ -9,4 +9,4 @@ export const statusOptions = [
   { label: '已归档', value: 'ARCHIVED' },
 ];
 
-export const getStatusFilterParam = (status: StatusFilterValue): KnowledgeListParams['status'] => (status === 'ALL' ? undefined : status);
+export const getStatusFilterParam = (status: StatusFilterValue | null): KnowledgeListParams['status'] => (status && status !== 'ALL' ? status : undefined);

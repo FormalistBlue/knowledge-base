@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { darkTheme, NConfigProvider, NMessageProvider } from 'naive-ui';
+import { darkTheme, dateZhCN, NConfigProvider, NMessageProvider, zhCN } from 'naive-ui';
 import { computed, onMounted } from 'vue';
 
 import { useThemeStore } from './stores/theme';
@@ -13,7 +13,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <NConfigProvider class="app-theme-provider" :theme="naiveTheme">
+  <NConfigProvider class="app-theme-provider" :theme="naiveTheme" :locale="zhCN" :date-locale="dateZhCN">
     <NMessageProvider>
       <RouterView />
     </NMessageProvider>

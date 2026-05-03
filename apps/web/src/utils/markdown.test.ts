@@ -27,4 +27,11 @@ describe('renderMarkdown', () => {
     expect(html).not.toContain('<svg');
     expect(html).not.toContain('onload');
   });
+
+  it('keeps authenticated blob URLs for protected markdown images', () => {
+    const html = renderMarkdown('![diagram](blob:http://local/file-1)');
+
+    expect(html).toContain('<img');
+    expect(html).toContain('src="blob:http://local/file-1"');
+  });
 });

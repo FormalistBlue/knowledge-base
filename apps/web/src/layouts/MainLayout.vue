@@ -58,7 +58,9 @@ const handleLogout = async () => {
     </NLayoutHeader>
     <NLayout class="app-main has-header">
       <NLayoutContent class="app-content">
-        <RouterView />
+        <div class="app-content-inner">
+          <RouterView />
+        </div>
       </NLayoutContent>
     </NLayout>
   </NLayout>

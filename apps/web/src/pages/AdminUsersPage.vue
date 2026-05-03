@@ -5,10 +5,9 @@ import {
   NDataTable,
   NForm,
   NFormItem,
-  NGrid,
-  NGi,
   NH2,
   NInput,
+  NModal,
   NPagination,
   NSelect,
   NSpace,
@@ -24,6 +23,7 @@ import { getErrorMessage } from '@/utils/error-message';
 
 const message = useMessage();
 const loading = ref(false);
+const createModalVisible = ref(false);
 const users = ref<CurrentUser[]>([]);
 const total = ref(0);
 const query = reactive({ page: 1, pageSize: 10, keyword: '', role: null as UserRole | null, status: null as UserStatus | null });
@@ -41,6 +41,7 @@ const selectedStatus = computed({
 });
 const createForm = reactive<CreateUserPayload>({ username: '', displayName: '', password: '', role: 'USER' });
 const resetPasswords = reactive<Record<string, string>>({});
+const savingPasswordIds = reactive<Record<string, boolean>>({});
 
 const roleOptions = [
   { label: '全部角色', value: '' },
@@ -70,6 +71,18 @@ const loadUsers = async () => {
   }
 };
 
+const resetCreateForm = () => {
+  createForm.username = '';
+  createForm.displayName = '';
+  createForm.password = '';
+  createForm.role = 'USER';
+};
+
+const openCreateModal = () => {
+  resetCreateForm();
+  createModalVisible.value = true;
+};
+
 const searchUsers = async () => {
   query.page = 1;
   await loadUsers();
@@ -85,10 +98,8 @@ const createUser = async () => {
   try {
     await authApi.createUser({ ...createForm });
     message.success('用户已创建');
-    createForm.username = '';
-    createForm.displayName = '';
-    createForm.password = '';
-    createForm.role = 'USER';
+    createModalVisible.value = false;
+    resetCreateForm();
     await loadUsers();
   } catch (error) {
     message.error(getErrorMessage(error, '创建用户失败'));
@@ -103,15 +114,56 @@ const toggleStatus = async (user: CurrentUser) => {
   await loadUsers();
 };
 
-const resetPassword = async (user: CurrentUser) => {
+const resetPassword = async (user: CurrentUser, showValidation = true) => {
   const newPassword = resetPasswords[user.id];
-  if (!newPassword || newPassword.length < 8) {
+  if (!newPassword) {
+    return;
+  }
+  if (newPassword.length < 8) {
+    if (showValidation) {
+      message.warning('请输入至少 8 位新密码');
+    }
+    return;
+  }
+  if (savingPasswordIds[user.id]) {
+    return;
+  }
+
+  savingPasswordIds[user.id] = true;
+  try {
+    await authApi.resetUserPassword(user.id, newPassword);
+    resetPasswords[user.id] = '';
+    message.success(`已重置 ${user.displayName} 的密码`);
+  } catch (error) {
+    message.error(getErrorMessage(error, '重置密码失败'));
+  } finally {
+    savingPasswordIds[user.id] = false;
+  }
+};
+
+const handlePasswordKeydown = (event: KeyboardEvent, user: CurrentUser) => {
+  if (event.key !== 'Enter') {
+    return;
+  }
+
+  event.preventDefault();
+  void resetPassword(user);
+};
+
+const handlePasswordBlur = (user: CurrentUser) => {
+  void resetPassword(user, false);
+};
+
+const resetPasswordByButton = async (user: CurrentUser) => {
+  if (savingPasswordIds[user.id] || !resetPasswords[user.id]) {
+    return;
+  }
+  if (resetPasswords[user.id].length < 8) {
     message.warning('请输入至少 8 位新密码');
     return;
   }
-  await authApi.resetUserPassword(user.id, newPassword);
-  resetPasswords[user.id] = '';
-  message.success(`已重置 ${user.displayName} 的密码`);
+
+  await resetPassword(user);
 };
 
 const columns: DataTableColumns<CurrentUser> = [
@@ -123,20 +175,28 @@ const columns: DataTableColumns<CurrentUser> = [
   {
     title: '重置密码',
     key: 'reset',
-    width: 260,
+    width: 320,
     render(row) {
-      return h(NSpace, { align: 'center' }, () => [
+      return h(NSpace, { align: 'center', wrap: false, class: 'reset-password-cell' }, () => [
         h(NInput, {
           value: resetPasswords[row.id] ?? '',
           type: 'password',
           showPasswordOn: 'click',
           placeholder: '新密码',
           size: 'small',
+          class: 'reset-password-input',
+          disabled: Boolean(savingPasswordIds[row.id]),
           'onUpdate:value': (value: string) => {
             resetPasswords[row.id] = value;
           },
+          onBlur: () => handlePasswordBlur(row),
+          onKeydown: (event: KeyboardEvent) => handlePasswordKeydown(event, row),
         }),
-        h(NButton, { size: 'small', secondary: true, onClick: () => resetPassword(row) }, { default: () => '重置' }),
+        h(
+          NButton,
+          { size: 'small', secondary: true, loading: Boolean(savingPasswordIds[row.id]), onClick: () => resetPasswordByButton(row) },
+          { default: () => '重置' },
+        ),
       ]);
     },
   },
@@ -171,22 +231,36 @@ onMounted(loadUsers);
         </NSpace>
       </NCard>
 
-      <NCard title="创建用户">
-        <NForm label-placement="top">
-          <NGrid :cols="4" :x-gap="16" responsive="screen">
-            <NGi><NFormItem label="用户名"><NInput v-model:value="createForm.username" /></NFormItem></NGi>
-            <NGi><NFormItem label="显示名"><NInput v-model:value="createForm.displayName" /></NFormItem></NGi>
-            <NGi><NFormItem label="初始密码"><NInput v-model:value="createForm.password" type="password" show-password-on="click" /></NFormItem></NGi>
-            <NGi><NFormItem label="角色"><NSelect v-model:value="createForm.role" :options="roleOptions.slice(1)" /></NFormItem></NGi>
-          </NGrid>
-          <NButton type="primary" @click="createUser">创建用户</NButton>
-        </NForm>
-      </NCard>
-
       <NCard title="用户列表">
+        <template #header-extra>
+          <NButton type="primary" @click="openCreateModal">新增用户</NButton>
+        </template>
         <NDataTable :loading="loading" :columns="columns" :data="users" :pagination="false" />
         <NPagination v-model:page="query.page" :page-size="query.pageSize" :item-count="total" @update:page="loadUsers" />
       </NCard>
+
+      <NModal v-model:show="createModalVisible" preset="card" title="新增用户" class="admin-dialog" :bordered="false">
+        <NForm label-placement="top">
+          <NFormItem label="用户名">
+            <NInput v-model:value="createForm.username" placeholder="请输入用户名" />
+          </NFormItem>
+          <NFormItem label="显示名">
+            <NInput v-model:value="createForm.displayName" placeholder="请输入显示名" />
+          </NFormItem>
+          <NFormItem label="初始密码">
+            <NInput v-model:value="createForm.password" type="password" show-password-on="click" placeholder="至少 8 位密码" />
+          </NFormItem>
+          <NFormItem label="角色">
+            <NSelect v-model:value="createForm.role" :options="roleOptions.slice(1)" />
+          </NFormItem>
+        </NForm>
+        <template #footer>
+          <NSpace justify="end">
+            <NButton @click="createModalVisible = false">取消</NButton>
+            <NButton type="primary" :loading="loading" @click="createUser">创建</NButton>
+          </NSpace>
+        </template>
+      </NModal>
     </NSpace>
   </section>
 </template>
