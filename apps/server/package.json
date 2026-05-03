@@ -7,6 +7,8 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
+    "db:deploy": "prisma migrate deploy",
+    "seed:prod": "node --import tsx prisma/seed.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.seed.json",
     "test": "vitest run --exclude=dist/**",
     "prisma": "prisma",
