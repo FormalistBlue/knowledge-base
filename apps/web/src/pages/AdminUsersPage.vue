@@ -236,7 +236,7 @@ onMounted(loadUsers);
           <NButton type="primary" @click="openCreateModal">新增用户</NButton>
         </template>
         <NDataTable :loading="loading" :columns="columns" :data="users" :pagination="false" />
-        <NPagination v-model:page="query.page" :page-size="query.pageSize" :item-count="total" @update:page="loadUsers" />
+        <NPagination class="table-pagination" v-model:page="query.page" :page-size="query.pageSize" :item-count="total" @update:page="loadUsers" />
       </NCard>
 
       <NModal v-model:show="createModalVisible" preset="card" title="新增用户" class="admin-dialog" :bordered="false">

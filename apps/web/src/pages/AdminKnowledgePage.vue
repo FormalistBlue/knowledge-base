@@ -198,14 +198,14 @@ onMounted(async () => {
     <NSpace vertical size="large">
       <NCard>
         <NSpace align="center" wrap>
-          <NInput v-model:value="query.keyword" clearable placeholder="搜索标题、摘要、正文或标签" @keyup.enter="search" />
+          <NInput v-model:value="query.keyword" clearable placeholder="搜索标题、摘要、正文或标签" class="filter-keyword" @keyup.enter="search" />
           <NSelect v-model:value="query.status" clearable :options="statusOptions" class="filter-control" />
           <NButton type="primary" @click="search">搜索</NButton>
         </NSpace>
       </NCard>
       <NCard title="文章管理">
         <NDataTable :loading="loading" :columns="columns" :data="items" :pagination="false" />
-        <NPagination v-model:page="query.page" :page-size="query.pageSize" :item-count="total" @update:page="loadKnowledge" />
+        <NPagination class="table-pagination" v-model:page="query.page" :page-size="query.pageSize" :item-count="total" @update:page="loadKnowledge" />
       </NCard>
     </NSpace>
   </section>

@@ -25,14 +25,28 @@ describe('admin taxonomy utils', () => {
     expect(flat.map((item) => item.depth)).toEqual([0, 1]);
   });
 
-  it('excludes the current editing category from parent options', () => {
+  it('deduplicates categories even when the same child is present under multiple roots', () => {
+    const child = category({ id: 'child', name: '子分类', parentId: 'root' });
+    const root = category({ id: 'root', name: '根分类', children: [child] });
+    const accidentalRootCopy = category({ id: 'other-root', name: '另一组', children: [child] });
+
+    const flat = flattenCategoryTree(getRootCategories([root, accidentalRootCopy, child]));
+
+    expect(flat.map((item) => item.id)).toEqual(['root', 'child', 'other-root']);
+  });
+
+  it('excludes the current editing category and its descendants from parent options', () => {
     const root = category({ id: 'root', name: '根分类' });
     const child = category({ id: 'child', name: '子分类', parentId: 'root' });
+    const grandchild = category({ id: 'grandchild', name: '孙分类', parentId: 'child' });
+    const sibling = category({ id: 'sibling', name: '同级分类' });
     const options = buildCategoryOptions([
       { ...root, depth: 0 },
       { ...child, depth: 1 },
+      { ...grandchild, depth: 2 },
+      { ...sibling, depth: 0 },
     ], 'child');
 
-    expect(options.map((option) => option.value)).toEqual(['', 'root']);
+    expect(options.map((option) => option.value)).toEqual(['', 'root', 'sibling']);
   });
 });

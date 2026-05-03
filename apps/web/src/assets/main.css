@@ -370,8 +370,13 @@ select {
 
 .filter-keyword,
 .filter-wide {
-  width: 360px;
+  width: 440px;
   max-width: 100%;
+}
+
+.table-pagination {
+  margin-top: 18px;
+  justify-content: flex-end;
 }
 
 .filter-date-range {
@@ -434,12 +439,35 @@ select {
   transform: translateY(-3px);
 }
 
+.knowledge-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: 18px;
+  align-items: start;
+}
+
+.knowledge-content-card,
+.knowledge-aside-card {
+  border-color: var(--kb-border) !important;
+  background: var(--kb-surface) !important;
+  box-shadow: var(--kb-shadow-card);
+}
+
+.knowledge-aside-card {
+  position: sticky;
+  top: 92px;
+}
+
+.knowledge-tags-block {
+  margin-top: 18px;
+}
+
 .knowledge-tags {
-  margin: 18px 0;
+  margin: 10px 0 0;
 }
 
 .knowledge-detail-meta {
-  margin-top: 20px;
+  margin-top: 0;
 }
 
 .markdown-preview {
@@ -889,6 +917,19 @@ select {
   .hero,
   .page-hero {
     padding: 28px;
+  }
+
+  .knowledge-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .knowledge-aside-card {
+    position: static;
+  }
+
+  .filter-keyword,
+  .filter-wide {
+    width: 100%;
   }
 
   .login-page {

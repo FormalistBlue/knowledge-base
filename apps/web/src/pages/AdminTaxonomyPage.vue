@@ -308,7 +308,7 @@ onMounted(loadTaxonomy);
           <NInput v-model:value="categoryForm.name" placeholder="例如：研发规范" />
         </NFormItem>
         <NFormItem label="父级分类">
-          <NSelect v-model:value="categoryForm.parentId" :options="categoryOptions" />
+          <NSelect v-model:value="categoryForm.parentId" :options="categoryOptions" filterable clearable value-field="value" label-field="label" />
         </NFormItem>
         <NFormItem label="排序值">
           <NInputNumber v-model:value="categoryForm.sortOrder" :min="0" :max="9999" />

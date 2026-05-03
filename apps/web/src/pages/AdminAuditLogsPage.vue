@@ -79,7 +79,7 @@ onMounted(loadLogs);
       </NSpace>
 
       <NDataTable :columns="columns" :data="logs" :loading="loading" :bordered="false" />
-      <NPagination v-model:page="query.page" :page-size="query.pageSize" :item-count="total" @update:page="loadLogs" />
+      <NPagination class="table-pagination" v-model:page="query.page" :page-size="query.pageSize" :item-count="total" @update:page="loadLogs" />
     </NSpace>
   </NCard>
 </template>

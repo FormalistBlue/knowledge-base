@@ -171,19 +171,27 @@ onBeforeUnmount(() => {
         </NSpace>
       </section>
 
-      <NCard>
-        <article class="markdown-preview" v-html="renderedKnowledgeContent"></article>
-        <NDescriptions bordered :column="3" size="small" class="knowledge-detail-meta">
-          <NDescriptionsItem label="作者">{{ knowledge.author.displayName }}</NDescriptionsItem>
-          <NDescriptionsItem label="分类">{{ knowledge.category.name }}</NDescriptionsItem>
-          <NDescriptionsItem label="浏览">{{ knowledge.viewCount }}</NDescriptionsItem>
-          <NDescriptionsItem label="点赞">{{ knowledge.likeCount }}</NDescriptionsItem>
-          <NDescriptionsItem label="收藏">{{ knowledge.favoriteCount }}</NDescriptionsItem>
-        </NDescriptions>
-        <NSpace class="knowledge-tags" size="small">
-          <NTag v-for="tag in knowledge.tags" :key="tag.id" size="small" type="info">{{ tag.name }}</NTag>
-        </NSpace>
-      </NCard>
+      <section class="knowledge-detail-grid">
+        <NCard class="knowledge-content-card" title="文章内容">
+          <article class="markdown-preview" v-html="renderedKnowledgeContent"></article>
+        </NCard>
+
+        <NCard class="knowledge-aside-card" title="文章信息">
+          <NDescriptions bordered :column="1" size="small" class="knowledge-detail-meta">
+            <NDescriptionsItem label="作者">{{ knowledge.author.displayName }}</NDescriptionsItem>
+            <NDescriptionsItem label="分类">{{ knowledge.category.name }}</NDescriptionsItem>
+            <NDescriptionsItem label="浏览">{{ knowledge.viewCount }}</NDescriptionsItem>
+            <NDescriptionsItem label="点赞">{{ knowledge.likeCount }}</NDescriptionsItem>
+            <NDescriptionsItem label="收藏">{{ knowledge.favoriteCount }}</NDescriptionsItem>
+          </NDescriptions>
+          <div class="knowledge-tags-block">
+            <NText depth="3">标签</NText>
+            <NSpace class="knowledge-tags" size="small">
+              <NTag v-for="tag in knowledge.tags" :key="tag.id" size="small" type="info">{{ tag.name }}</NTag>
+            </NSpace>
+          </div>
+        </NCard>
+      </section>
 
       <NCard v-if="attachmentFiles.length" title="附件下载">
         <NList bordered>

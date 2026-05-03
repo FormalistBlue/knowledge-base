@@ -63,7 +63,7 @@ onMounted(loadComments);
       </NCard>
       <NCard title="评论管理">
         <NDataTable :loading="loading" :columns="columns" :data="items" :pagination="false" />
-        <NPagination v-model:page="query.page" :page-size="query.pageSize" :item-count="total" @update:page="loadComments" />
+        <NPagination class="table-pagination" v-model:page="query.page" :page-size="query.pageSize" :item-count="total" @update:page="loadComments" />
       </NCard>
     </NSpace>
   </section>
