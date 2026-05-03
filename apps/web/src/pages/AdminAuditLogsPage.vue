@@ -4,6 +4,7 @@ import { h, onMounted, reactive, ref, watch } from 'vue';
 
 import { adminAuditApi } from '@/api/admin';
 import type { AuditAction, AuditLogItem } from '@/types/admin';
+import { pageSizeOptions } from '@/utils/pagination';
 
 const loading = ref(false);
 const logs = ref<AuditLogItem[]>([]);
@@ -62,6 +63,17 @@ const loadLogs = async () => {
   }
 };
 
+const handlePageChange = async (nextPage: number) => {
+  query.page = nextPage;
+  await loadLogs();
+};
+
+const handlePageSizeChange = async (nextPageSize: number) => {
+  query.page = 1;
+  query.pageSize = nextPageSize;
+  await loadLogs();
+};
+
 watch(() => [query.keyword, query.action], () => {
   query.page = 1;
   void loadLogs();
@@ -79,7 +91,16 @@ onMounted(loadLogs);
       </NSpace>
 
       <NDataTable :columns="columns" :data="logs" :loading="loading" :bordered="false" />
-      <NPagination class="table-pagination" v-model:page="query.page" :page-size="query.pageSize" :item-count="total" @update:page="loadLogs" />
+      <NPagination
+        class="table-pagination"
+        :page="query.page"
+        :page-size="query.pageSize"
+        :page-sizes="pageSizeOptions"
+        :item-count="total"
+        show-size-picker
+        @update:page="handlePageChange"
+        @update:page-size="handlePageSizeChange"
+      />
     </NSpace>
   </NCard>
 </template>

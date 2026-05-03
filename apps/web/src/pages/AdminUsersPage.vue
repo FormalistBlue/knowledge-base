@@ -20,6 +20,7 @@ import { computed, h, onMounted, reactive, ref } from 'vue';
 import { authApi } from '@/api/auth';
 import type { CreateUserPayload, CurrentUser, UserRole, UserStatus } from '@/types/auth';
 import { getErrorMessage } from '@/utils/error-message';
+import { pageSizeOptions } from '@/utils/pagination';
 
 const message = useMessage();
 const loading = ref(false);
@@ -85,6 +86,17 @@ const openCreateModal = () => {
 
 const searchUsers = async () => {
   query.page = 1;
+  await loadUsers();
+};
+
+const handlePageChange = async (nextPage: number) => {
+  query.page = nextPage;
+  await loadUsers();
+};
+
+const handlePageSizeChange = async (nextPageSize: number) => {
+  query.page = 1;
+  query.pageSize = nextPageSize;
   await loadUsers();
 };
 
@@ -236,7 +248,16 @@ onMounted(loadUsers);
           <NButton type="primary" @click="openCreateModal">新增用户</NButton>
         </template>
         <NDataTable :loading="loading" :columns="columns" :data="users" :pagination="false" />
-        <NPagination class="table-pagination" v-model:page="query.page" :page-size="query.pageSize" :item-count="total" @update:page="loadUsers" />
+        <NPagination
+          class="table-pagination"
+          :page="query.page"
+          :page-size="query.pageSize"
+          :page-sizes="pageSizeOptions"
+          :item-count="total"
+          show-size-picker
+          @update:page="handlePageChange"
+          @update:page-size="handlePageSizeChange"
+        />
       </NCard>
 
       <NModal v-model:show="createModalVisible" preset="card" title="新增用户" class="admin-dialog" :bordered="false">

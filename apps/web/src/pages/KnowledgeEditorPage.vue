@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { NButton, NCard, NForm, NFormItem, NH1, NInput, NSelect, NSpace, NSpin, NTag, useMessage, type SelectOption } from 'naive-ui';
+import { NButton, NCard, NForm, NFormItem, NH1, NInput, NModal, NSelect, NSpace, NSpin, NTag, useMessage, type SelectOption } from 'naive-ui';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { knowledgeApi } from '@/api/knowledge';
 import { taxonomyApi } from '@/api/taxonomy';
 import { getErrorMessage } from '@/utils/error-message';
+import { renderMarkdown } from '@/utils/markdown';
 import AttachmentUploader from '@/components/AttachmentUploader.vue';
 import ImageUploader from '@/components/ImageUploader.vue';
 import TagSelect from '@/components/TagSelect.vue';
@@ -17,6 +18,7 @@ const route = useRoute();
 const router = useRouter();
 const message = useMessage();
 const loading = ref(false);
+const previewVisible = ref(false);
 const categories = ref<CategoryNode[]>([]);
 const tags = ref<TagItem[]>([]);
 const files = ref<UploadedFile[]>([]);
@@ -41,6 +43,16 @@ const flattenCategories = (nodes: CategoryNode[], depth = 0): SelectOption[] => 
 };
 
 const categoryOptions = computed(() => flattenCategories(categories.value));
+const renderedPreview = computed(() => renderMarkdown(form.content || ''));
+
+const cancelEdit = async () => {
+  if (isEdit.value) {
+    await router.push({ name: 'knowledge-detail', params: { id: knowledgeId.value } });
+    return;
+  }
+
+  await router.push({ name: 'knowledge-list' });
+};
 
 const loadOptions = async () => {
   const [categoryList, tagList] = await Promise.all([taxonomyApi.getCategories(), taxonomyApi.getTags()]);
@@ -122,17 +134,28 @@ onMounted(init);
             <ImageUploader v-model:files="files" v-model:markdown="form.content" />
           </NFormItem>
           <NFormItem label="正文 Markdown">
-            <NInput v-model:value="form.content" type="textarea" placeholder="# 标题\n正文内容" :autosize="{ minRows: 14 }" />
+            <NSpace vertical size="small" class="editor-markdown-field">
+              <NInput v-model:value="form.content" type="textarea" placeholder="# 标题\n正文内容" :autosize="{ minRows: 14 }" />
+              <NSpace justify="end">
+                <NButton secondary @click="previewVisible = true">预览 Markdown</NButton>
+              </NSpace>
+            </NSpace>
           </NFormItem>
           <NFormItem label="附件">
             <AttachmentUploader v-model:files="files" />
           </NFormItem>
           <NSpace>
+            <NButton @click="cancelEdit">取消</NButton>
             <NButton @click="submit('DRAFT')">保存草稿</NButton>
             <NButton type="primary" @click="submit('PUBLISHED')">发布知识</NButton>
           </NSpace>
         </NForm>
       </NCard>
     </main>
+
+    <NModal v-model:show="previewVisible" preset="card" class="markdown-preview-modal" title="Markdown 预览" size="huge">
+      <article v-if="form.content.trim()" class="markdown-preview editor-preview" v-html="renderedPreview"></article>
+      <NCard v-else class="editor-preview-empty" embedded>当前还没有可预览的 Markdown 内容。</NCard>
+    </NModal>
   </NSpin>
 </template>

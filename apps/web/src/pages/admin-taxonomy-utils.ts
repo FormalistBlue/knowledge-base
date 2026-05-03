@@ -3,11 +3,20 @@ import type { SelectOption } from 'naive-ui';
 import type { CategoryNode } from '@/types/taxonomy';
 
 export type FlatCategory = Omit<CategoryNode, 'children'> & {
-  children: CategoryNode[];
   depth: number;
 };
 
 const getChildCategories = (category: CategoryNode) => category.children.filter((child) => child.parentId === category.id);
+
+const dedupeById = <T extends { id: string }>(items: T[]) => {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (seen.has(item.id)) return false;
+
+    seen.add(item.id);
+    return true;
+  });
+};
 
 export const flattenCategoryTree = (items: CategoryNode[], depth = 0, seen = new Set<string>()): FlatCategory[] => {
   return items.flatMap((item) => {
@@ -15,12 +24,23 @@ export const flattenCategoryTree = (items: CategoryNode[], depth = 0, seen = new
 
     seen.add(item.id);
     const children = getChildCategories(item);
-    return [{ ...item, children, depth }, ...flattenCategoryTree(children, depth + 1, seen)];
+    const { children: _children, ...category } = item;
+    return [{ ...category, depth }, ...flattenCategoryTree(children, depth + 1, seen)];
   });
 };
 
 export const getRootCategories = (categories: CategoryNode[]) => {
-  const childIds = new Set(categories.flatMap((category) => category.children.map((child) => child.id)));
+  const childIds = new Set<string>();
+  const collectChildIds = (category: CategoryNode) => {
+    category.children.forEach((child) => {
+      if (childIds.has(child.id)) return;
+
+      childIds.add(child.id);
+      collectChildIds(child);
+    });
+  };
+
+  categories.forEach(collectChildIds);
   return categories.filter((category) => !category.parentId || !childIds.has(category.id));
 };
 
@@ -42,11 +62,12 @@ const collectBlockedCategoryIds = (category: FlatCategory, categories: FlatCateg
 };
 
 export const buildCategoryOptions = (categories: FlatCategory[], editingId: string | null): SelectOption[] => {
+  const uniqueCategories = dedupeById(categories);
   const blockedIds = editingId
-    ? collectBlockedCategoryIds(categories.find((category) => category.id === editingId) ?? ({ id: editingId } as FlatCategory), categories)
+    ? collectBlockedCategoryIds(uniqueCategories.find((category) => category.id === editingId) ?? ({ id: editingId } as FlatCategory), uniqueCategories)
     : new Set<string>();
 
-  const options = categories
+  const options = uniqueCategories
     .filter((category) => !blockedIds.has(category.id))
     .map((category) => ({
       label: `${'—'.repeat(category.depth)} ${category.name}`,

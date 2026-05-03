@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { NButton, NCard, NDataTable, NInput, NPagination, NSpace, useMessage, type DataTableColumns } from 'naive-ui';
+import { NButton, NCard, NDataTable, NInput, NPagination, NPopconfirm, NSpace, useMessage, type DataTableColumns } from 'naive-ui';
 import { h, onMounted, reactive, ref } from 'vue';
 
 import { adminCommentsApi, commentsApi } from '@/api/interactions';
 import type { AdminCommentItem } from '@/types/interactions';
+import { pageSizeOptions } from '@/utils/pagination';
 
 const message = useMessage();
 const loading = ref(false);
@@ -27,6 +28,17 @@ const search = async () => {
   await loadComments();
 };
 
+const handlePageChange = async (nextPage: number) => {
+  query.page = nextPage;
+  await loadComments();
+};
+
+const handlePageSizeChange = async (nextPageSize: number) => {
+  query.page = 1;
+  query.pageSize = nextPageSize;
+  await loadComments();
+};
+
 const deleteComment = async (row: AdminCommentItem) => {
   await commentsApi.delete(row.id);
   message.success('评论已删除');
@@ -44,7 +56,14 @@ const columns: DataTableColumns<AdminCommentItem> = [
     key: 'actions',
     width: 100,
     render(row) {
-      return h(NButton, { size: 'small', type: 'error', secondary: true, onClick: () => deleteComment(row) }, { default: () => '删除' });
+      return h(
+        NPopconfirm,
+        { onPositiveClick: () => deleteComment(row) },
+        {
+          trigger: () => h(NButton, { size: 'small', type: 'error', secondary: true }, { default: () => '删除' }),
+          default: () => `确认删除这条评论吗？来自「${row.knowledge.title}」的评论将被移除。`,
+        },
+      );
     },
   },
 ];
@@ -63,7 +82,16 @@ onMounted(loadComments);
       </NCard>
       <NCard title="评论管理">
         <NDataTable :loading="loading" :columns="columns" :data="items" :pagination="false" />
-        <NPagination class="table-pagination" v-model:page="query.page" :page-size="query.pageSize" :item-count="total" @update:page="loadComments" />
+        <NPagination
+          class="table-pagination"
+          :page="query.page"
+          :page-size="query.pageSize"
+          :page-sizes="pageSizeOptions"
+          :item-count="total"
+          show-size-picker
+          @update:page="handlePageChange"
+          @update:page-size="handlePageSizeChange"
+        />
       </NCard>
     </NSpace>
   </section>

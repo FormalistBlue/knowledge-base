@@ -9,15 +9,28 @@ import {
   NSpace,
   useMessage,
 } from 'naive-ui';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 
 import { useAuthStore } from '@/stores/auth';
 import { useThemeStore } from '@/stores/theme';
 
+const route = useRoute();
 const router = useRouter();
 const message = useMessage();
 const authStore = useAuthStore();
 const themeStore = useThemeStore();
+
+const isRouteActive = (routeNames: string[]) => routeNames.includes(String(route.name ?? ''));
+
+const isAdminRouteActive = () => String(route.name ?? '').startsWith('admin-');
+
+const navButtonProps = (active: boolean) =>
+  ({
+    type: active ? 'primary' : 'default',
+    secondary: active,
+    quaternary: !active,
+    round: true,
+  }) as const;
 
 const handleLogout = async () => {
   await authStore.logout();
@@ -38,11 +51,13 @@ const handleLogout = async () => {
           </div>
         </div>
         <NSpace align="center" class="app-nav">
-          <NButton quaternary round @click="router.push({ name: 'knowledge-list' })">知识库</NButton>
-          <NButton quaternary round @click="router.push({ name: 'my-favorites' })">我的收藏</NButton>
-          <NButton quaternary round @click="router.push({ name: 'notifications' })">通知</NButton>
-          <NButton type="primary" round @click="router.push({ name: 'knowledge-create' })">创建知识</NButton>
-          <NButton v-if="authStore.isAdmin" secondary round @click="router.push({ name: 'admin-users' })">
+          <NButton v-bind="navButtonProps(isRouteActive(['knowledge-list', 'knowledge-detail', 'knowledge-edit']))" @click="router.push({ name: 'knowledge-list' })">
+            知识库
+          </NButton>
+          <NButton v-bind="navButtonProps(isRouteActive(['my-favorites']))" @click="router.push({ name: 'my-favorites' })">我的收藏</NButton>
+          <NButton v-bind="navButtonProps(isRouteActive(['notifications']))" @click="router.push({ name: 'notifications' })">通知</NButton>
+          <NButton v-bind="navButtonProps(isRouteActive(['knowledge-create']))" @click="router.push({ name: 'knowledge-create' })">创建知识</NButton>
+          <NButton v-if="authStore.isAdmin" v-bind="navButtonProps(isAdminRouteActive())" @click="router.push({ name: 'admin-users' })">
             后台管理
           </NButton>
           <span class="app-user-pill">{{ authStore.currentUser?.displayName }}</span>

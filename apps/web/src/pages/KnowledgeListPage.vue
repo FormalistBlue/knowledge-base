@@ -25,12 +25,12 @@ import { knowledgeApi } from '@/api/knowledge';
 import { taxonomyApi } from '@/api/taxonomy';
 import type { KnowledgeSummary } from '@/types/knowledge';
 import type { CategoryNode, TagItem } from '@/types/taxonomy';
+import { pageSizeOptions } from '@/utils/pagination';
 
 const route = useRoute();
 const router = useRouter();
 const message = useMessage();
 const loading = ref(false);
-const filterLoading = ref(false);
 const items = ref<KnowledgeSummary[]>([]);
 const categories = ref<CategoryNode[]>([]);
 const tags = ref<TagItem[]>([]);
@@ -87,20 +87,13 @@ const applyRouteQuery = () => {
 };
 
 const loadFilters = async () => {
-  filterLoading.value = true;
-  try {
-    const [categoryResult, tagResult] = await Promise.all([taxonomyApi.getCategories(), taxonomyApi.getTags()]);
-    categories.value = categoryResult;
-    tags.value = tagResult;
-  } catch (error) {
-    message.error(error instanceof Error ? error.message : '筛选项加载失败');
-  } finally {
-    filterLoading.value = false;
-  }
+  const [categoryResult, tagResult] = await Promise.all([taxonomyApi.getCategories(), taxonomyApi.getTags()]);
+  categories.value = categoryResult;
+  tags.value = tagResult;
 };
 
-const loadKnowledge = async () => {
-  loading.value = true;
+const loadKnowledge = async (showLoading = true) => {
+  if (showLoading) loading.value = true;
   try {
     const result = await knowledgeApi.list({
       page: query.page,
@@ -119,12 +112,23 @@ const loadKnowledge = async () => {
   } catch (error) {
     message.error(error instanceof Error ? error.message : '知识列表加载失败');
   } finally {
-    loading.value = false;
+    if (showLoading) loading.value = false;
   }
 };
 
 const handleSearch = async () => {
   query.page = 1;
+  await loadKnowledge();
+};
+
+const handlePageChange = async (nextPage: number) => {
+  query.page = nextPage;
+  await loadKnowledge();
+};
+
+const handlePageSizeChange = async (nextPageSize: number) => {
+  query.page = 1;
+  query.pageSize = nextPageSize;
   await loadKnowledge();
 };
 
@@ -140,8 +144,15 @@ const resetFilters = async () => {
 };
 
 onMounted(async () => {
-  applyRouteQuery();
-  await Promise.all([loadFilters(), loadKnowledge()]);
+  loading.value = true;
+  try {
+    applyRouteQuery();
+    await Promise.all([loadFilters(), loadKnowledge(false)]);
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '知识库加载失败');
+  } finally {
+    loading.value = false;
+  }
 });
 
 watch(
@@ -166,8 +177,8 @@ watch(
     </section>
 
     <NCard>
-      <NSpace vertical size="large">
-        <NSpin :show="filterLoading">
+      <NSpin :show="loading">
+        <NSpace vertical size="large">
           <NSpace vertical size="medium">
             <NSpace align="center" wrap>
               <NInput v-model:value="query.keyword" clearable placeholder="搜索标题、摘要、正文或标签" class="filter-keyword" @keyup.enter="handleSearch" />
@@ -194,35 +205,47 @@ watch(
               <NButton secondary @click="resetFilters">重置</NButton>
             </NSpace>
           </NSpace>
-        </NSpin>
 
-        <NSpin :show="loading">
           <NEmpty v-if="items.length === 0" description="暂无知识内容" />
-          <NList v-else hoverable clickable>
+          <NList v-else hoverable clickable class="knowledge-list-results">
             <NListItem v-for="item in items" :key="item.id" @click="router.push({ name: 'knowledge-detail', params: { id: item.id } })">
-              <NSpace vertical size="small">
-                <NSpace align="center">
-                  <NText strong>{{ item.title }}</NText>
-                  <NTag v-if="item.isPinned" size="small" type="warning">置顶</NTag>
-                  <NTag size="small" :type="item.status === 'PUBLISHED' ? 'success' : 'default'">{{ item.status }}</NTag>
-                </NSpace>
-                <NText depth="3">{{ item.summary }}</NText>
-                <NSpace size="small">
-                  <NTag size="small">{{ item.category.name }}</NTag>
-                  <NTag v-for="tag in item.tags" :key="tag.id" size="small" type="info">{{ tag.name }}</NTag>
-                </NSpace>
-                <NText depth="3">
-                  {{ item.author.displayName }} · 浏览 {{ item.viewCount }} · 点赞 {{ item.likeCount }} · 收藏 {{ item.favoriteCount }} · 发布
-                  {{ item.publishedAt ? new Date(item.publishedAt).toLocaleDateString() : '-' }} · 更新
-                  {{ new Date(item.updatedAt).toLocaleString() }}
-                </NText>
-              </NSpace>
+              <div class="knowledge-list-item">
+                <div class="knowledge-list-main">
+                  <div class="knowledge-list-title-row">
+                    <NText strong>{{ item.title }}</NText>
+                    <NTag v-if="item.isPinned" size="small" type="warning">置顶</NTag>
+                    <NTag size="small" :type="item.status === 'PUBLISHED' ? 'success' : 'default'">{{ item.status }}</NTag>
+                  </div>
+                  <NText depth="3" class="knowledge-list-summary">{{ item.summary }}</NText>
+                  <NSpace size="small" class="knowledge-list-tags">
+                    <NTag size="small">{{ item.category.name }}</NTag>
+                    <NTag v-for="tag in item.tags" :key="tag.id" size="small" type="info">{{ tag.name }}</NTag>
+                  </NSpace>
+                </div>
+                <div class="knowledge-list-meta" aria-label="文章信息">
+                  <span>{{ item.author.displayName }}</span>
+                  <span>浏览 {{ item.viewCount }}</span>
+                  <span>点赞 {{ item.likeCount }}</span>
+                  <span>收藏 {{ item.favoriteCount }}</span>
+                  <span>发布 {{ item.publishedAt ? new Date(item.publishedAt).toLocaleDateString() : '-' }}</span>
+                  <span>更新 {{ new Date(item.updatedAt).toLocaleDateString() }}</span>
+                </div>
+              </div>
             </NListItem>
           </NList>
-        </NSpin>
 
-        <NPagination v-model:page="query.page" :page-size="query.pageSize" :item-count="total" @update:page="loadKnowledge" />
-      </NSpace>
+        <NPagination
+          class="table-pagination"
+          :page="query.page"
+          :page-size="query.pageSize"
+          :page-sizes="pageSizeOptions"
+          :item-count="total"
+          show-size-picker
+          @update:page="handlePageChange"
+          @update:page-size="handlePageSizeChange"
+        />
+        </NSpace>
+      </NSpin>
     </NCard>
   </main>
 </template>

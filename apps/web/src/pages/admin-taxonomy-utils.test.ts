@@ -23,6 +23,7 @@ describe('admin taxonomy utils', () => {
 
     expect(flat.map((item) => item.id)).toEqual(['root', 'child']);
     expect(flat.map((item) => item.depth)).toEqual([0, 1]);
+    expect(flat.some((item) => 'children' in item)).toBe(false);
   });
 
   it('deduplicates categories even when the same child is present under multiple roots', () => {
@@ -48,5 +49,17 @@ describe('admin taxonomy utils', () => {
     ], 'child');
 
     expect(options.map((option) => option.value)).toEqual(['', 'root', 'sibling']);
+  });
+
+  it('deduplicates parent select options when flat categories contain repeated nodes', () => {
+    const root = category({ id: 'root', name: '根分类' });
+    const child = category({ id: 'child', name: '子分类', parentId: 'root' });
+    const options = buildCategoryOptions([
+      { ...root, depth: 0 },
+      { ...child, depth: 1 },
+      { ...child, depth: 1 },
+    ], null);
+
+    expect(options.map((option) => option.value)).toEqual(['', 'root', 'child']);
   });
 });

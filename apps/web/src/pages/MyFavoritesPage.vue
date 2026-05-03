@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router';
 
 import { knowledgeApi } from '@/api/knowledge';
 import type { KnowledgeSummary } from '@/types/knowledge';
+import { pageSizeOptions } from '@/utils/pagination';
 
 const router = useRouter();
 const message = useMessage();
@@ -25,6 +26,17 @@ const loadFavorites = async () => {
   } finally {
     loading.value = false;
   }
+};
+
+const handlePageChange = async (nextPage: number) => {
+  page.value = nextPage;
+  await loadFavorites();
+};
+
+const handlePageSizeChange = async (nextPageSize: number) => {
+  page.value = 1;
+  pageSize.value = nextPageSize;
+  await loadFavorites();
 };
 
 onMounted(loadFavorites);
@@ -63,7 +75,16 @@ onMounted(loadFavorites);
           </NListItem>
         </NList>
       </NSpin>
-      <NPagination v-model:page="page" :page-size="pageSize" :item-count="total" @update:page="loadFavorites" />
+      <NPagination
+        class="table-pagination"
+        :page="page"
+        :page-size="pageSize"
+        :page-sizes="pageSizeOptions"
+        :item-count="total"
+        show-size-picker
+        @update:page="handlePageChange"
+        @update:page-size="handlePageSizeChange"
+      />
     </NCard>
   </main>
 </template>

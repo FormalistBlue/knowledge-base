@@ -7,6 +7,7 @@ import { taxonomyApi } from '@/api/taxonomy';
 import type { KnowledgeSummary } from '@/types/knowledge';
 import type { CategoryNode, TagItem } from '@/types/taxonomy';
 import { getErrorMessage } from '@/utils/error-message';
+import { pageSizeOptions } from '@/utils/pagination';
 import { getStatusFilterParam, statusOptions, type StatusFilterValue } from './admin-knowledge-filters';
 
 const message = useMessage();
@@ -57,6 +58,17 @@ const loadKnowledge = async () => {
 
 const search = async () => {
   query.page = 1;
+  await loadKnowledge();
+};
+
+const handlePageChange = async (nextPage: number) => {
+  query.page = nextPage;
+  await loadKnowledge();
+};
+
+const handlePageSizeChange = async (nextPageSize: number) => {
+  query.page = 1;
+  query.pageSize = nextPageSize;
   await loadKnowledge();
 };
 
@@ -205,7 +217,16 @@ onMounted(async () => {
       </NCard>
       <NCard title="文章管理">
         <NDataTable :loading="loading" :columns="columns" :data="items" :pagination="false" />
-        <NPagination class="table-pagination" v-model:page="query.page" :page-size="query.pageSize" :item-count="total" @update:page="loadKnowledge" />
+        <NPagination
+          class="table-pagination"
+          :page="query.page"
+          :page-size="query.pageSize"
+          :page-sizes="pageSizeOptions"
+          :item-count="total"
+          show-size-picker
+          @update:page="handlePageChange"
+          @update:page-size="handlePageSizeChange"
+        />
       </NCard>
     </NSpace>
   </section>

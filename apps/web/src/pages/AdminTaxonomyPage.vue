@@ -135,7 +135,7 @@ const saveCategory = async () => {
   await loadTaxonomy();
 };
 
-const editCategory = (category: CategoryNode) => {
+const editCategory = (category: FlatCategory) => {
   categoryEditingId.value = category.id;
   categoryForm.name = category.name;
   categoryForm.parentId = category.parentId ?? '';

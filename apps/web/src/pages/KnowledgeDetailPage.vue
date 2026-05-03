@@ -2,8 +2,6 @@
 import {
   NButton,
   NCard,
-  NDescriptions,
-  NDescriptionsItem,
   NH1,
   NList,
   NListItem,
@@ -160,7 +158,12 @@ onBeforeUnmount(() => {
           </NButton>
           <template v-if="canManage">
             <NButton @click="router.push({ name: 'knowledge-edit', params: { id: knowledge.id } })">编辑</NButton>
-            <NButton secondary @click="handleArchive">归档</NButton>
+            <NPopconfirm @positive-click="handleArchive">
+              <template #trigger>
+                <NButton secondary>归档</NButton>
+              </template>
+              确认归档这篇知识吗？归档后普通列表将不再优先展示。
+            </NPopconfirm>
             <NPopconfirm @positive-click="handleDelete">
               <template #trigger>
                 <NButton type="error" secondary>删除</NButton>
@@ -177,13 +180,28 @@ onBeforeUnmount(() => {
         </NCard>
 
         <NCard class="knowledge-aside-card" title="文章信息">
-          <NDescriptions bordered :column="1" size="small" class="knowledge-detail-meta">
-            <NDescriptionsItem label="作者">{{ knowledge.author.displayName }}</NDescriptionsItem>
-            <NDescriptionsItem label="分类">{{ knowledge.category.name }}</NDescriptionsItem>
-            <NDescriptionsItem label="浏览">{{ knowledge.viewCount }}</NDescriptionsItem>
-            <NDescriptionsItem label="点赞">{{ knowledge.likeCount }}</NDescriptionsItem>
-            <NDescriptionsItem label="收藏">{{ knowledge.favoriteCount }}</NDescriptionsItem>
-          </NDescriptions>
+          <div class="knowledge-info-grid">
+            <div class="knowledge-info-item">
+              <span>作者</span>
+              <strong>{{ knowledge.author.displayName }}</strong>
+            </div>
+            <div class="knowledge-info-item">
+              <span>分类</span>
+              <strong>{{ knowledge.category.name }}</strong>
+            </div>
+            <div class="knowledge-info-item">
+              <span>浏览</span>
+              <strong>{{ knowledge.viewCount }}</strong>
+            </div>
+            <div class="knowledge-info-item">
+              <span>点赞</span>
+              <strong>{{ knowledge.likeCount }}</strong>
+            </div>
+            <div class="knowledge-info-item">
+              <span>收藏</span>
+              <strong>{{ knowledge.favoriteCount }}</strong>
+            </div>
+          </div>
           <div class="knowledge-tags-block">
             <NText depth="3">标签</NText>
             <NSpace class="knowledge-tags" size="small">
