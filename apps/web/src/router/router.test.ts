@@ -16,6 +16,7 @@ describe('router configuration', () => {
     expect(router.hasRoute('admin-knowledge')).toBe(true);
     expect(router.hasRoute('admin-comments')).toBe(true);
     expect(router.hasRoute('admin-audit-logs')).toBe(true);
+    expect(router.hasRoute('my-drafts')).toBe(true);
     expect(router.hasRoute('notifications')).toBe(true);
     expect(router.hasRoute('unauthorized')).toBe(true);
   });

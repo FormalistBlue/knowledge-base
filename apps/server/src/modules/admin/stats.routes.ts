@@ -45,11 +45,13 @@ adminStatsRouter.get(
       totalUsers,
       activeUsers,
       disabledUsers,
+      adminUsers,
       attachmentAggregate,
       knowledgeViews,
       comments,
       categories,
       tags,
+      categoryBreakdown,
     ] = await prisma.$transaction([
       prisma.knowledgeItem.count({ where: { deletedAt: null } }),
       prisma.knowledgeItem.count({ where: { deletedAt: null, status: KnowledgeStatus.PUBLISHED } }),
@@ -58,11 +60,18 @@ adminStatsRouter.get(
       prisma.user.count({ where: { deletedAt: null } }),
       prisma.user.count({ where: { deletedAt: null, status: UserStatus.ACTIVE } }),
       prisma.user.count({ where: { deletedAt: null, status: UserStatus.DISABLED } }),
+      prisma.user.count({ where: { deletedAt: null, role: UserRole.ADMIN } }),
       prisma.attachment.aggregate({ where: { deletedAt: null }, _count: { _all: true }, _sum: { fileSize: true } }),
       prisma.knowledgeItem.aggregate({ where: { deletedAt: null }, _sum: { viewCount: true } }),
       prisma.comment.count({ where: { deletedAt: null } }),
       prisma.category.count({ where: { deletedAt: null } }),
       prisma.tag.count({ where: { deletedAt: null } }),
+      prisma.category.findMany({
+        where: { deletedAt: null },
+        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+        include: { _count: { select: { items: { where: { deletedAt: null } } } } },
+        take: 12,
+      }),
     ]);
 
     sendSuccess(res, {
@@ -77,8 +86,13 @@ adminStatsRouter.get(
           total: totalUsers,
           active: activeUsers,
           disabled: disabledUsers,
-          admins: await prisma.user.count({ where: { deletedAt: null, role: UserRole.ADMIN } }),
+          admins: adminUsers,
         },
+        categoryBreakdown: categoryBreakdown.map((category) => ({
+          id: category.id,
+          name: category.name,
+          knowledgeCount: category._count.items,
+        })),
         totalViews: knowledgeViews._sum.viewCount ?? 0,
         attachments: {
           total: attachmentAggregate._count._all,

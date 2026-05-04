@@ -162,10 +162,6 @@ const handlePasswordKeydown = (event: KeyboardEvent, user: CurrentUser) => {
   void resetPassword(user);
 };
 
-const handlePasswordBlur = (user: CurrentUser) => {
-  void resetPassword(user, false);
-};
-
 const resetPasswordByButton = async (user: CurrentUser) => {
   if (savingPasswordIds[user.id] || !resetPasswords[user.id]) {
     return;
@@ -201,7 +197,6 @@ const columns: DataTableColumns<CurrentUser> = [
           'onUpdate:value': (value: string) => {
             resetPasswords[row.id] = value;
           },
-          onBlur: () => handlePasswordBlur(row),
           onKeydown: (event: KeyboardEvent) => handlePasswordKeydown(event, row),
         }),
         h(

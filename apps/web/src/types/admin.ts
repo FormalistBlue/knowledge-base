@@ -13,6 +13,11 @@ export type AdminStatsOverview = {
     disabled: number;
     admins: number;
   };
+  categoryBreakdown: Array<{
+    id: string;
+    name: string;
+    knowledgeCount: number;
+  }>;
   totalViews: number;
   attachments: {
     total: number;

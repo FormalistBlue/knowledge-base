@@ -13,5 +13,5 @@ const options = computed(() => props.tags.map((tag) => ({ label: tag.name, value
 </script>
 
 <template>
-  <NSelect v-model:value="model" multiple filterable placeholder="选择标签" :options="options" />
+  <NSelect v-model:value="model" multiple filterable placeholder="选择标签" :options="options" class="tag-select-control" />
 </template>

@@ -150,15 +150,19 @@ onBeforeUnmount(() => {
           <NText depth="3">{{ knowledge.summary }}</NText>
         </div>
         <NSpace>
-          <NButton :type="knowledge.likedByMe ? 'primary' : 'default'" secondary @click="toggleLike">
-            {{ knowledge.likedByMe ? '已点赞' : '点赞' }} {{ knowledge.likeCount }}
-          </NButton>
-          <NButton :type="knowledge.favoritedByMe ? 'warning' : 'default'" secondary @click="toggleFavorite">
-            {{ knowledge.favoritedByMe ? '已收藏' : '收藏' }} {{ knowledge.favoriteCount }}
-          </NButton>
+          <template v-if="!isDraft">
+            <NButton :type="knowledge.likedByMe ? 'primary' : 'default'" secondary @click="toggleLike">
+              {{ knowledge.likedByMe ? '已点赞' : '点赞' }} {{ knowledge.likeCount }}
+            </NButton>
+            <NButton :type="knowledge.favoritedByMe ? 'warning' : 'default'" secondary @click="toggleFavorite">
+              {{ knowledge.favoritedByMe ? '已收藏' : '收藏' }} {{ knowledge.favoriteCount }}
+            </NButton>
+          </template>
           <template v-if="canManage">
-            <NButton @click="router.push({ name: 'knowledge-edit', params: { id: knowledge.id } })">编辑</NButton>
-            <NPopconfirm @positive-click="handleArchive">
+            <NButton :type="isDraft ? 'primary' : 'default'" :size="isDraft ? 'large' : 'medium'" @click="router.push({ name: 'knowledge-edit', params: { id: knowledge.id } })">
+              {{ isDraft ? '继续编辑草稿' : '编辑' }}
+            </NButton>
+            <NPopconfirm v-if="!isDraft" @positive-click="handleArchive">
               <template #trigger>
                 <NButton secondary>归档</NButton>
               </template>

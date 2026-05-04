@@ -15,6 +15,7 @@ const KnowledgeDetailPage = () => import('@/pages/KnowledgeDetailPage.vue');
 const KnowledgeEditorPage = () => import('@/pages/KnowledgeEditorPage.vue');
 const KnowledgeListPage = () => import('@/pages/KnowledgeListPage.vue');
 const LoginPage = () => import('@/pages/LoginPage.vue');
+const MyDraftsPage = () => import('@/pages/MyDraftsPage.vue');
 const MyFavoritesPage = () => import('@/pages/MyFavoritesPage.vue');
 const NotificationsPage = () => import('@/pages/NotificationsPage.vue');
 const UnauthorizedPage = () => import('@/pages/UnauthorizedPage.vue');
@@ -55,6 +56,12 @@ const router = createRouter({
           path: 'me/favorites',
           name: 'my-favorites',
           component: MyFavoritesPage,
+          meta: { requiresAuth: true },
+        },
+        {
+          path: 'me/drafts',
+          name: 'my-drafts',
+          component: MyDraftsPage,
           meta: { requiresAuth: true },
         },
         {

@@ -45,10 +45,6 @@ const flattenCategories = (nodes: CategoryNode[], depth = 0): SelectOption[] => 
 };
 
 const categoryOptions = computed(() => flattenCategories(categories.value));
-const selectedCategoryName = computed(() => categoryOptions.value.find((option) => option.value === form.categoryId)?.label?.toString().trim() || '未选择');
-const selectedTagNames = computed(() => tags.value.filter((tag) => form.tagIds.includes(tag.id)).map((tag) => tag.name));
-const imageCount = computed(() => files.value.filter((file) => file.usageType === 'IMAGE').length);
-const attachmentCount = computed(() => files.value.filter((file) => file.usageType === 'ATTACHMENT').length);
 const renderedPreview = computed(() => renderMarkdown(replaceProtectedImageUrls(form.content || '', markdownImageUrls.value)));
 
 const refreshMarkdownImageUrls = async () => {
@@ -146,7 +142,7 @@ onBeforeUnmount(() => {
         </NSpace>
       </section>
 
-      <section class="knowledge-editor-grid">
+      <section class="knowledge-editor-grid knowledge-editor-grid--wide">
         <NCard class="knowledge-editor-main-card">
           <NForm label-placement="top">
             <div class="editor-section-heading">
@@ -195,25 +191,6 @@ onBeforeUnmount(() => {
           </NForm>
         </NCard>
 
-        <aside class="knowledge-editor-aside">
-          <NCard class="knowledge-editor-submit-card">
-            <NTag round type="success">Ready to publish</NTag>
-            <strong>发布前检查</strong>
-            <NText depth="3">主操作固定在这里，写完后不用回到页面底部找发布按钮。</NText>
-            <div class="editor-checklist">
-              <div><span>标题</span><strong>{{ form.title.trim() ? '已填写' : '未填写' }}</strong></div>
-              <div><span>分类</span><strong>{{ selectedCategoryName }}</strong></div>
-              <div><span>标签</span><strong>{{ selectedTagNames.length || 0 }} 个</strong></div>
-              <div><span>图片</span><strong>{{ imageCount }} 张</strong></div>
-              <div><span>附件</span><strong>{{ attachmentCount }} 个</strong></div>
-            </div>
-            <NSpace vertical>
-              <NButton type="primary" size="large" block @click="submit('PUBLISHED')">发布知识</NButton>
-              <NButton secondary block @click="submit('DRAFT')">保存草稿</NButton>
-              <NButton quaternary block @click="previewVisible = true">预览 Markdown</NButton>
-            </NSpace>
-          </NCard>
-        </aside>
       </section>
     </main>
 

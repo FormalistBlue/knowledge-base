@@ -45,6 +45,35 @@ const averageViews = computed(() => {
 const contentBacklog = computed(() => (stats.value ? stats.value.knowledge.draft + stats.value.knowledge.archived : 0));
 const taxonomyTotal = computed(() => (stats.value ? stats.value.categories + stats.value.tags : 0));
 
+const categoryTotal = computed(() => stats.value?.categoryBreakdown.reduce((total, category) => total + category.knowledgeCount, 0) ?? 0);
+const categoryChartItems = computed(() => {
+  const total = categoryTotal.value;
+  return (stats.value?.categoryBreakdown ?? [])
+    .filter((category) => category.knowledgeCount > 0)
+    .map((category, index) => ({
+      ...category,
+      percentage: total ? Math.round((category.knowledgeCount / total) * 100) : 0,
+      color: `var(--chart-${(index % 6) + 1})`,
+    }));
+});
+const categoryConicGradient = computed(() => {
+  if (categoryChartItems.value.length === 0) {
+    return 'conic-gradient(var(--kb-border) 0 360deg)';
+  }
+
+  let cursor = 0;
+  const segments = categoryChartItems.value.map((item) => {
+    const start = cursor;
+    const end = cursor + item.percentage;
+    cursor = end;
+    return `${item.color} ${start}% ${end}%`;
+  });
+  if (cursor < 100) {
+    segments.push(`var(--kb-surface-muted) ${cursor}% 100%`);
+  }
+  return `conic-gradient(${segments.join(', ')})`;
+});
+
 onMounted(loadStats);
 </script>
 
@@ -56,7 +85,7 @@ onMounted(loadStats);
         <NH1>后台概览</NH1>
         <NText depth="3">用一个视角看清内容产能、用户状态、互动质量和资料规模。</NText>
       </div>
-      <NSpace class="admin-dashboard-hero__actions">
+      <NSpace class="admin-dashboard-hero__actions" align="center" wrap>
         <NButton secondary @click="loadStats">刷新数据</NButton>
         <NButton type="primary" @click="router.push({ name: 'admin-knowledge' })">管理文章</NButton>
       </NSpace>
@@ -118,6 +147,33 @@ onMounted(loadStats);
             </NCard>
           </NGi>
         </NGrid>
+
+        <NCard class="admin-dashboard-panel admin-dashboard-chart-panel admin-dashboard-wide">
+          <div class="dashboard-section-title">
+            <div>
+              <strong>分类内容占比</strong>
+              <NText depth="3">按分类看知识分布，帮助判断哪些栏目需要补充或拆分。</NText>
+            </div>
+            <NTag round>{{ categoryTotal }} 篇已归类知识</NTag>
+          </div>
+          <div class="dashboard-category-chart">
+            <div class="category-donut" :style="{ background: categoryConicGradient }">
+              <div class="category-donut__center">
+                <strong>{{ categoryChartItems.length }}</strong>
+                <span>个活跃分类</span>
+              </div>
+            </div>
+            <div class="category-chart-list">
+              <div v-for="item in categoryChartItems" :key="item.id" class="category-chart-row">
+                <span class="category-chart-row__dot" :style="{ background: item.color }"></span>
+                <strong>{{ item.name }}</strong>
+                <div class="category-chart-row__bar"><span :style="{ width: `${item.percentage}%`, background: item.color }"></span></div>
+                <small>{{ item.knowledgeCount }} 篇 · {{ item.percentage }}%</small>
+              </div>
+              <NText v-if="categoryChartItems.length === 0" depth="3">还没有可统计的分类内容。</NText>
+            </div>
+          </div>
+        </NCard>
 
         <NCard class="admin-dashboard-panel admin-dashboard-wide">
           <div class="dashboard-section-title">

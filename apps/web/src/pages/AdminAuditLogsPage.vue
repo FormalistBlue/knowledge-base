@@ -90,7 +90,7 @@ onMounted(loadLogs);
         <NSelect v-model:value="query.action" clearable :options="actionOptions" class="filter-control" />
       </NSpace>
 
-      <NDataTable :columns="columns" :data="logs" :loading="loading" :bordered="false" />
+      <NDataTable :columns="columns" :data="logs" :loading="loading" />
       <NPagination
         class="table-pagination"
         :page="query.page"

@@ -54,6 +54,7 @@ const handleLogout = async () => {
           <NButton v-bind="navButtonProps(isRouteActive(['knowledge-list', 'knowledge-detail', 'knowledge-edit']))" @click="router.push({ name: 'knowledge-list' })">
             知识库
           </NButton>
+          <NButton v-bind="navButtonProps(isRouteActive(['my-drafts']))" @click="router.push({ name: 'my-drafts' })">我的草稿</NButton>
           <NButton v-bind="navButtonProps(isRouteActive(['my-favorites']))" @click="router.push({ name: 'my-favorites' })">我的收藏</NButton>
           <NButton v-bind="navButtonProps(isRouteActive(['notifications']))" @click="router.push({ name: 'notifications' })">通知</NButton>
           <NButton v-bind="navButtonProps(isRouteActive(['knowledge-create']))" @click="router.push({ name: 'knowledge-create' })">创建知识</NButton>
