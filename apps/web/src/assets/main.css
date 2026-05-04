@@ -864,6 +864,9 @@ select {
 .admin-dashboard-hero__actions {
   position: relative;
   z-index: 2;
+  flex: 0 0 auto;
+  min-width: 240px;
+  margin-left: auto;
 }
 
 .admin-dashboard-grid {
@@ -875,6 +878,12 @@ select {
 .admin-dashboard-metrics,
 .admin-dashboard-wide {
   grid-column: 1 / -1;
+}
+
+.admin-dashboard-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
 }
 
 .admin-dashboard-panel,
@@ -1004,14 +1013,13 @@ select {
 
 .dashboard-category-chart {
   display: grid;
-  grid-template-columns: minmax(220px, 0.34fr) minmax(0, 1fr);
-  gap: 24px;
+  gap: 20px;
   align-items: center;
 }
 
 .category-donut {
   position: relative;
-  width: min(260px, 100%);
+  width: min(220px, 100%);
   aspect-ratio: 1;
   justify-self: center;
   border: 1px solid var(--kb-border);
@@ -1633,6 +1641,7 @@ select {
   .knowledge-editor-grid,
   .knowledge-editor-title-row,
   .admin-dashboard-grid,
+  .admin-dashboard-chart-grid,
   .dashboard-category-chart,
   .category-chart-row,
   .draft-list-item,
@@ -1657,6 +1666,12 @@ select {
   .dashboard-section-title,
   .asset-uploader-head {
     flex-direction: column;
+  }
+
+  .admin-dashboard-hero__actions {
+    align-items: flex-start !important;
+    min-width: 0;
+    margin-left: 0;
   }
 
   .asset-uploader-head {

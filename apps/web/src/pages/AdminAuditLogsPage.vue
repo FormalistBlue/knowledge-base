@@ -43,8 +43,8 @@ const columns: DataTableColumns<AuditLogItem> = [
   { title: '时间', key: 'createdAt', width: 180, render: (row) => new Date(row.createdAt).toLocaleString() },
   { title: '操作人', key: 'actor', width: 160, render: (row) => `${row.actor.displayName} (${row.actor.username})` },
   { title: '动作', key: 'action', width: 130, render: (row) => h(NTag, { size: 'small' }, { default: () => actionText[row.action] ?? row.action }) },
-  { title: '目标', key: 'targetType', width: 150, render: (row) => `${row.targetType}${row.targetId ? ` / ${row.targetId.slice(0, 8)}` : ''}` },
-  { title: '摘要', key: 'summary' },
+  { title: '目标', key: 'targetType', width: 190, render: (row) => `${row.targetType}${row.targetId ? ` / ${row.targetId.slice(0, 8)}` : ''}` },
+  { title: '摘要', key: 'summary', minWidth: 280 },
 ];
 
 const loadLogs = async () => {

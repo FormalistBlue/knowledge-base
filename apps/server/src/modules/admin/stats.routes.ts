@@ -52,6 +52,7 @@ adminStatsRouter.get(
       categories,
       tags,
       categoryBreakdown,
+      tagBreakdown,
     ] = await prisma.$transaction([
       prisma.knowledgeItem.count({ where: { deletedAt: null } }),
       prisma.knowledgeItem.count({ where: { deletedAt: null, status: KnowledgeStatus.PUBLISHED } }),
@@ -70,6 +71,12 @@ adminStatsRouter.get(
         where: { deletedAt: null },
         orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
         include: { _count: { select: { items: { where: { deletedAt: null } } } } },
+        take: 12,
+      }),
+      prisma.tag.findMany({
+        where: { deletedAt: null },
+        orderBy: [{ createdAt: 'asc' }],
+        include: { _count: { select: { items: { where: { knowledge: { deletedAt: null } } } } } },
         take: 12,
       }),
     ]);
@@ -92,6 +99,11 @@ adminStatsRouter.get(
           id: category.id,
           name: category.name,
           knowledgeCount: category._count.items,
+        })),
+        tagBreakdown: tagBreakdown.map((tag) => ({
+          id: tag.id,
+          name: tag.name,
+          knowledgeCount: tag._count.items,
         })),
         totalViews: knowledgeViews._sum.viewCount ?? 0,
         attachments: {

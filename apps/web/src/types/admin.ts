@@ -18,6 +18,11 @@ export type AdminStatsOverview = {
     name: string;
     knowledgeCount: number;
   }>;
+  tagBreakdown: Array<{
+    id: string;
+    name: string;
+    knowledgeCount: number;
+  }>;
   totalViews: number;
   attachments: {
     total: number;
