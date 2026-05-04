@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NButton, NCard, NEmpty, NList, NListItem, NPopconfirm, NProgress, NSpace, NText, NThing, NUpload, useMessage, type UploadCustomRequestOptions, type UploadFileInfo } from 'naive-ui';
+import { NButton, NPopconfirm, NProgress, NSpace, NText, NUpload, useMessage, type UploadCustomRequestOptions } from 'naive-ui';
 import { computed, ref } from 'vue';
 
 import { filesApi } from '@/api/files';
@@ -53,33 +53,40 @@ const removeFile = (fileId: string) => {
 </script>
 
 <template>
-  <NCard embedded class="attachment-uploader">
-    <NSpace vertical>
+  <div class="attachment-uploader asset-uploader-panel">
+    <div class="asset-uploader-head">
+      <div>
+        <strong>附件资料</strong>
+        <NText depth="3">支持 PDF、Word、Excel、PPT、TXT、Markdown、ZIP 等文件，单个文件最大 50MB。</NText>
+      </div>
       <NUpload :custom-request="handleUpload" :show-file-list="false" :disabled="uploading">
-        <NButton :loading="uploading">上传附件</NButton>
+        <NButton type="primary" secondary :loading="uploading">选择附件</NButton>
       </NUpload>
-      <NText depth="3">支持 PDF、Word、Excel、PPT、TXT、Markdown、ZIP 等文件，单个文件最大 50MB。</NText>
-      <NProgress v-if="uploading || uploadPercent" type="line" :percentage="uploadPercent" processing />
+    </div>
+    <NProgress v-if="uploading || uploadPercent" type="line" :percentage="uploadPercent" processing />
 
-      <NList v-if="attachmentFiles.length" bordered>
-        <NListItem v-for="file in attachmentFiles" :key="file.id">
-          <NThing :title="file.originalName" :description="getFileDescription(file)">
-            <template #header-extra>
-              <NSpace>
-                <NButton v-if="['pdf'].includes(file.extension)" text @click="previewFile(file)">预览</NButton>
-                <NButton text @click="downloadFile(file)">下载</NButton>
-                <NPopconfirm @positive-click="removeFile(file.id)">
-                  <template #trigger>
-                    <NButton text type="error">移除</NButton>
-                  </template>
-                  确认从本文中移除此附件？
-                </NPopconfirm>
-              </NSpace>
+    <div v-if="attachmentFiles.length" class="attachment-list">
+      <div v-for="file in attachmentFiles" :key="file.id" class="attachment-item">
+        <div class="attachment-item__icon">{{ file.extension || 'file' }}</div>
+        <div class="attachment-item__body">
+          <strong>{{ file.originalName }}</strong>
+          <span>{{ getFileDescription(file) }}</span>
+        </div>
+        <NSpace class="attachment-item__actions" size="small">
+          <NButton v-if="file.extension === 'pdf'" secondary size="small" @click="previewFile(file)">预览</NButton>
+          <NButton secondary size="small" @click="downloadFile(file)">下载</NButton>
+          <NPopconfirm @positive-click="removeFile(file.id)">
+            <template #trigger>
+              <NButton secondary size="small" type="error">移除</NButton>
             </template>
-          </NThing>
-        </NListItem>
-      </NList>
-      <NEmpty v-else description="暂无附件" size="small" />
-    </NSpace>
-  </NCard>
+            确认从本文中移除此附件？
+          </NPopconfirm>
+        </NSpace>
+      </div>
+    </div>
+    <div v-else class="asset-empty-state">
+      <span>还没有附件</span>
+      <NText depth="3">可以补充原始文档、表格或压缩包，方便读者继续下载使用。</NText>
+    </div>
+  </div>
 </template>

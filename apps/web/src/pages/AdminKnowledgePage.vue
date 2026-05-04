@@ -7,6 +7,7 @@ import { taxonomyApi } from '@/api/taxonomy';
 import type { KnowledgeSummary } from '@/types/knowledge';
 import type { CategoryNode, TagItem } from '@/types/taxonomy';
 import { getErrorMessage } from '@/utils/error-message';
+import { getKnowledgeStatusLabel, getKnowledgeStatusTagType } from '@/utils/knowledge-status';
 import { pageSizeOptions } from '@/utils/pagination';
 import { getStatusFilterParam, statusOptions, type StatusFilterValue } from './admin-knowledge-filters';
 
@@ -144,7 +145,7 @@ const deleteKnowledge = async (row: KnowledgeSummary) => {
 const columns: DataTableColumns<KnowledgeSummary> = [
   { title: '标题', key: 'title', width: 220 },
   { title: '作者', key: 'author', render: (row) => row.author.displayName },
-  { title: '状态', key: 'status', render: (row) => h(NTag, { type: row.status === 'PUBLISHED' ? 'success' : 'default', size: 'small' }, { default: () => row.status }) },
+  { title: '状态', key: 'status', render: (row) => h(NTag, { type: getKnowledgeStatusTagType(row.status), size: 'small' }, { default: () => getKnowledgeStatusLabel(row.status) }) },
   {
     title: '分类',
     key: 'category',

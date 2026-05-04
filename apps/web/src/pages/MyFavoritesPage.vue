@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router';
 
 import { knowledgeApi } from '@/api/knowledge';
 import type { KnowledgeSummary } from '@/types/knowledge';
+import { getKnowledgeStatusLabel, getKnowledgeStatusTagType } from '@/utils/knowledge-status';
 import { pageSizeOptions } from '@/utils/pagination';
 
 const router = useRouter();
@@ -61,7 +62,7 @@ onMounted(loadFavorites);
               <NSpace align="center">
                 <NText strong>{{ item.title }}</NText>
                 <NTag v-if="item.isPinned" size="small" type="warning">置顶</NTag>
-                <NTag size="small" type="success">{{ item.status }}</NTag>
+                <NTag size="small" :type="getKnowledgeStatusTagType(item.status)">{{ getKnowledgeStatusLabel(item.status) }}</NTag>
               </NSpace>
               <NText depth="3">{{ item.summary }}</NText>
               <NSpace size="small">

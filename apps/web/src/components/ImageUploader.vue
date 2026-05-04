@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NButton, NImage, NInput, NPopconfirm, NProgress, NSpace, NText, NUpload, useMessage, type UploadCustomRequestOptions } from 'naive-ui';
+import { NButton, NImage, NPopconfirm, NProgress, NText, NUpload, useMessage, type UploadCustomRequestOptions } from 'naive-ui';
 import { computed, onBeforeUnmount, ref } from 'vue';
 
 import { filesApi } from '@/api/files';
@@ -23,9 +23,12 @@ const previewUrls = ref<Record<string, string>>({});
 
 const imageFiles = computed(() => props.files.filter((file) => file.usageType === 'IMAGE'));
 
+const createMarkdownImage = (file: UploadedFile) => `![${file.originalName}](${file.url})`;
+
 const appendMarkdownImage = (file: UploadedFile) => {
-  const imageMarkdown = `\n![${file.originalName}](${file.url})\n`;
-  emit('update:markdown', `${props.markdown}${imageMarkdown}`);
+  const imageMarkdown = createMarkdownImage(file);
+  const nextMarkdown = props.markdown.trimEnd() ? `${props.markdown.trimEnd()}\n\n${imageMarkdown}\n` : `${imageMarkdown}\n`;
+  emit('update:markdown', nextMarkdown);
 };
 
 const getPreviewUrl = async (file: UploadedFile) => {
@@ -70,12 +73,22 @@ const handleUpload = async ({ file, onFinish, onError }: UploadCustomRequestOpti
   }
 };
 
-const removeImage = (fileId: string) => {
-  const url = previewUrls.value[fileId];
+const removeImageMarkdown = (file: UploadedFile) => {
+  const escapedUrl = file.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escapedName = file.originalName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const markdownPattern = new RegExp(`\\n{0,2}!\\[${escapedName}\\]\\(${escapedUrl}\\)\\n?`, 'g');
+  const fallbackPattern = new RegExp(`\\n{0,2}!\\[[^\\]]*\\]\\(${escapedUrl}\\)\\n?`, 'g');
+  const nextMarkdown = props.markdown.replace(markdownPattern, '\n').replace(fallbackPattern, '\n').replace(/\n{3,}/g, '\n\n').trimEnd();
+  emit('update:markdown', nextMarkdown);
+};
+
+const removeImage = (file: UploadedFile) => {
+  const url = previewUrls.value[file.id];
   if (url) URL.revokeObjectURL(url);
-  const { [fileId]: _removed, ...rest } = previewUrls.value;
+  const { [file.id]: _removed, ...rest } = previewUrls.value;
   previewUrls.value = rest;
-  emit('update:files', props.files.filter((file) => file.id !== fileId));
+  emit('update:files', props.files.filter((item) => item.id !== file.id));
+  removeImageMarkdown(file);
 };
 
 onBeforeUnmount(() => {
@@ -84,26 +97,38 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <NSpace vertical class="image-uploader">
-    <NSpace align="center">
+  <div class="image-uploader asset-uploader-panel">
+    <div class="asset-uploader-head">
+      <div>
+        <strong>正文图片</strong>
+        <NText depth="3">上传后自动插入 Markdown；移除图片会同步删除正文里的图片语法。</NText>
+      </div>
       <NUpload accept="image/jpeg,image/png,image/gif,image/webp" :custom-request="handleUpload" :show-file-list="false" :disabled="uploading">
-        <NButton :loading="uploading">上传图片并插入正文</NButton>
+        <NButton type="primary" secondary :loading="uploading">选择图片</NButton>
       </NUpload>
-      <NText depth="3">支持 JPG、PNG、GIF、WebP。上传后会自动插入 Markdown 图片语法。</NText>
-    </NSpace>
+    </div>
     <NProgress v-if="uploading || uploadPercent" type="line" :percentage="uploadPercent" processing />
 
     <div v-if="imageFiles.length" class="image-grid">
       <div v-for="file in imageFiles" :key="file.id" class="image-card">
-        <NImage :src="previewUrls[file.id]" :alt="file.originalName" object-fit="cover" width="120" height="90" @vue:mounted="ensurePreviewUrl(file)" />
-        <NInput :value="`![${file.originalName}](${file.url})`" readonly size="small" />
-        <NPopconfirm @positive-click="removeImage(file.id)">
+        <div class="image-card__preview">
+          <NImage :src="previewUrls[file.id]" :alt="file.originalName" object-fit="cover" width="100%" height="150" @vue:mounted="ensurePreviewUrl(file)" />
+        </div>
+        <div class="image-card__body">
+          <strong>{{ file.originalName }}</strong>
+          <span>{{ createMarkdownImage(file) }}</span>
+        </div>
+        <NPopconfirm @positive-click="removeImage(file)">
           <template #trigger>
-            <NButton text type="error">移除</NButton>
+            <NButton secondary type="error" size="small">移除图片和正文引用</NButton>
           </template>
-          确认从本文中移除此图片？
+          确认从本文中移除此图片？正文里的 Markdown 图片语法也会一起删除。
         </NPopconfirm>
       </div>
     </div>
-  </NSpace>
+    <div v-else class="asset-empty-state">
+      <span>还没有图片</span>
+      <NText depth="3">建议上传正文配图、流程截图或示意图，让知识内容更易理解。</NText>
+    </div>
+  </div>
 </template>

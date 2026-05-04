@@ -24,6 +24,7 @@ import type { CommentItem } from '@/types/interactions';
 import type { KnowledgeDetail } from '@/types/knowledge';
 import { downloadFile, previewFile } from '@/utils/file-actions';
 import { getFileDescription } from '@/utils/file-display';
+import { getKnowledgeStatusLabel, getKnowledgeStatusTagType } from '@/utils/knowledge-status';
 import { renderMarkdown } from '@/utils/markdown';
 import { loadProtectedImageUrls, replaceProtectedImageUrls, revokeProtectedImageUrls } from '@/utils/markdown-images';
 
@@ -45,6 +46,7 @@ const canManage = computed(() => {
   return authStore.isAdmin || knowledge.value.author.id === authStore.currentUser.id;
 });
 const attachmentFiles = computed(() => knowledge.value?.attachments.filter((file) => file.usageType === 'ATTACHMENT') ?? []);
+const isDraft = computed(() => knowledge.value?.status === 'DRAFT');
 const renderedKnowledgeContent = computed(() => {
   if (!knowledge.value) return '';
   return renderMarkdown(replaceProtectedImageUrls(knowledge.value.content, markdownImageUrls.value));
@@ -61,10 +63,8 @@ const loadDetail = async () => {
       delete replyVisible[id];
     });
     const nextKnowledge = await knowledgeApi.detail(knowledgeId.value);
-    const [nextComments, nextImageUrls] = await Promise.all([
-      commentsApi.list(knowledgeId.value),
-      loadProtectedImageUrls(nextKnowledge.attachments),
-    ]);
+    const nextCommentsPromise = nextKnowledge.status === 'DRAFT' ? Promise.resolve([]) : commentsApi.list(knowledgeId.value);
+    const [nextComments, nextImageUrls] = await Promise.all([nextCommentsPromise, loadProtectedImageUrls(nextKnowledge.attachments)]);
     knowledge.value = nextKnowledge;
     comments.value = nextComments;
     markdownImageUrls.value = nextImageUrls;
@@ -145,7 +145,7 @@ onBeforeUnmount(() => {
     <main v-if="knowledge" class="page-stack">
       <section class="page-hero compact">
         <div>
-          <NTag type="success" round>{{ knowledge.status }}</NTag>
+          <NTag :type="getKnowledgeStatusTagType(knowledge.status)" round>{{ getKnowledgeStatusLabel(knowledge.status) }}</NTag>
           <NH1>{{ knowledge.title }}</NH1>
           <NText depth="3">{{ knowledge.summary }}</NText>
         </div>
@@ -226,7 +226,7 @@ onBeforeUnmount(() => {
         </NList>
       </NCard>
 
-      <NCard title="评论区">
+      <NCard v-if="!isDraft" title="评论区">
         <NSpace vertical size="large">
           <div class="comment-compose">
             <NInput v-model:value="commentContent" type="textarea" placeholder="写下你的评论" class="comment-input" :autosize="{ minRows: 3, maxRows: 6 }" />

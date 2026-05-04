@@ -25,6 +25,7 @@ import { knowledgeApi } from '@/api/knowledge';
 import { taxonomyApi } from '@/api/taxonomy';
 import type { KnowledgeSummary } from '@/types/knowledge';
 import type { CategoryNode, TagItem } from '@/types/taxonomy';
+import { getKnowledgeStatusLabel, getKnowledgeStatusTagType } from '@/utils/knowledge-status';
 import { pageSizeOptions } from '@/utils/pagination';
 
 const route = useRoute();
@@ -214,7 +215,7 @@ watch(
                   <div class="knowledge-list-title-row">
                     <NText strong>{{ item.title }}</NText>
                     <NTag v-if="item.isPinned" size="small" type="warning">置顶</NTag>
-                    <NTag size="small" :type="item.status === 'PUBLISHED' ? 'success' : 'default'">{{ item.status }}</NTag>
+                    <NTag size="small" :type="getKnowledgeStatusTagType(item.status)">{{ getKnowledgeStatusLabel(item.status) }}</NTag>
                   </div>
                   <NText depth="3" class="knowledge-list-summary">{{ item.summary }}</NText>
                   <NSpace size="small" class="knowledge-list-tags">
